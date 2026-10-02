@@ -4,3 +4,4 @@ node_modules/
 *.csv
 test-results/
 playwright-report/
+recon/

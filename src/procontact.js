@@ -5,10 +5,12 @@ import { chromium } from 'playwright';
 
 const TEMPO = 45_000;
 
-async function entrar(page, usuario, senha) {
-  await page.getByLabel(/usu[aá]rio|login|e-?mail/i).first().fill(usuario);
-  await page.getByLabel(/senha/i).first().fill(senha);
-  await page.getByRole('button', { name: /entrar|login|acessar/i }).first().click();
+// Seletores confirmados na gravação de 02/10/2026 (codegen): campos input[name="login"] e input[name="password"],
+// botão "Entrar". Exportados também para o script de reconhecimento (scripts/recon-calendario.js).
+export async function entrar(page, usuario, senha) {
+  await page.locator('input[name="login"]').fill(usuario);
+  await page.locator('input[name="password"]').fill(senha);
+  await page.getByRole('button', { name: /entrar/i }).click();
   const menu = page.getByText('Relatório', { exact: true }).first();
   const recusado = page.getByText(/senha inv[aá]lida|usu[aá]rio inv[aá]lido|credenciais|incorret/i).first();
   const resultado = await Promise.race([
@@ -19,30 +21,29 @@ async function entrar(page, usuario, senha) {
   if (resultado === 'timeout') throw new Error('o menu não apareceu depois do login (tela mudou?)');
 }
 
-async function abrirChamadasManuais(page) {
-  await page.getByText('Relatório', { exact: true }).first().click();
-  // "Call Center" existe no menu principal e dentro de Relatório; o de dentro vem depois no DOM.
-  await page.getByText('Call Center', { exact: true }).last().click();
-  await page.getByText('Chamadas Manuais', { exact: true }).click();
-  await page.getByText(/^filtros$/i).first().waitFor({ timeout: TEMPO });
+// O link "Chamadas Manuais" só aparece com os grupos do menu abertos (Relatório > Call Center). A gravação usou
+// getByText('Call Center').nth(4), frágil: aqui abrimos "Relatório" e vamos clicando nos "Call Center" (do último
+// para o primeiro) até o link ficar visível.
+export async function abrirChamadasManuais(page) {
+  const link = page.getByRole('link', { name: 'Chamadas Manuais' });
+  const visivel = () => link.isVisible().catch(() => false);
+  if (!(await visivel())) {
+    await page.getByText('Relatório', { exact: true }).first().click();
+    const grupos = page.getByText('Call Center', { exact: true });
+    for (let i = (await grupos.count()) - 1; i >= 0 && !(await visivel()); i--) {
+      await grupos.nth(i).click({ timeout: 5_000 }).catch(() => {});
+      await page.waitForTimeout(300);
+    }
+  }
+  if (!(await visivel())) throw new Error('não achei o link "Chamadas Manuais" no menu (tela mudou?)');
+  await link.click();
+  await page.getByText(/^filtros$/i).first().click(); // abre o painel de filtros, como na gravação
 }
 
-async function campoPeriodo(page) {
-  const porRotulo = page.getByLabel(/per[ií]odo/i).first();
-  if (await porRotulo.count()) return porRotulo;
-  return page.locator('input[value*="/20"]').first();
-}
-
-async function definirPeriodo(page, texto) {
-  const campo = await campoPeriodo(page);
-  await campo.click();
-  await campo.press('Control+A');
-  await campo.fill(texto);
-  await campo.press('Enter');
-  const aplicar = page.getByRole('button', { name: /aplicar|ok|confirmar/i }).first();
-  if (await aplicar.isVisible().catch(() => false)) await aplicar.click();
-  const valor = await campo.inputValue();
-  if (valor.trim() !== texto) throw new Error('não consegui definir o período no filtro (tela mudou?)');
+// O período é escolhido por CLIQUES no calendário (o texto "01/10/2026 00:00 - 02/10/2026 23:59" não é um campo
+// digitável) e não há botão "Aplicar". Falta mapear o calendário: veja scripts/recon-calendario.js.
+async function definirPeriodo() {
+  throw new Error('seleção de datas pelo calendário ainda não implementada (aguarda o reconhecimento do calendário)');
 }
 
 export async function exportarRelatorio({ url, usuario, senha, textoPeriodo, pasta }) {
