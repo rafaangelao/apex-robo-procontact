@@ -32,7 +32,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: node src/main.js
         env:
-          MODO: ${{ inputs.modo || 'real' }}
+          MODO: ${{ github.event_name == 'workflow_dispatch' && (inputs.modo || 'dry') || 'real' }}
           FORCAR: ${{ github.event_name == 'workflow_dispatch' }}
           PROCONTACT_URL: ${{ secrets.PROCONTACT_URL }}
           PROCONTACT_USUARIO: ${{ secrets.PROCONTACT_USUARIO }}
