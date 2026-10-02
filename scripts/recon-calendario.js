@@ -1,16 +1,25 @@
 // scripts/recon-calendario.js
 // DIAGNÓSTICO (não faz parte do robô): entra no ProContact, abre Chamadas Manuais > Filtros > seletor de Período e
 // salva em recon/ o HTML e uma imagem da tela, para mapear o calendário. NÃO clica em Buscar: nenhum telefone/
-// dado de cliente aparece. Usuário/senha vêm de variáveis de ambiente (digitadas por você, nunca no chat).
-//   $env:PROCONTACT_URL="https://eaglesales.procontact.com.br/pages/login"; $env:PROCONTACT_USUARIO="<conta>"
-//   $s = Read-Host "Senha" -AsSecureString; $env:PROCONTACT_SENHA=[Net.NetworkCredential]::new('',$s).Password
-//   node scripts/recon-calendario.js
+// dado de cliente aparece. Uso:  node scripts/recon-calendario.js
+// O script PERGUNTA o usuário e a senha no terminal (a senha é digitada oculta; nada vai para arquivo, histórico
+// ou chat). Se existirem as variáveis PROCONTACT_USUARIO / PROCONTACT_SENHA, usa elas em vez de perguntar.
 import fs from 'node:fs';
+import readline from 'node:readline';
 import { chromium } from 'playwright';
 import { entrar, abrirChamadasManuais } from '../src/procontact.js';
 
-const { PROCONTACT_URL, PROCONTACT_USUARIO, PROCONTACT_SENHA } = process.env;
-if (!PROCONTACT_URL || !PROCONTACT_USUARIO || !PROCONTACT_SENHA) { console.error('Defina PROCONTACT_URL, PROCONTACT_USUARIO e PROCONTACT_SENHA.'); process.exit(1); }
+function perguntar(texto, oculto = false) {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+    if (oculto) rl._writeToOutput = (s) => { process.stdout.write(s.includes(texto) ? s : '*'); };
+    rl.question(texto, (r) => { rl.close(); if (oculto) process.stdout.write('\n'); resolve(r); });
+  });
+}
+const PROCONTACT_URL = process.env.PROCONTACT_URL || 'https://eaglesales.procontact.com.br/pages/login';
+const PROCONTACT_USUARIO = process.env.PROCONTACT_USUARIO || (await perguntar('Usuário do ProContact: ')).trim();
+const PROCONTACT_SENHA = process.env.PROCONTACT_SENHA || (await perguntar('Senha (oculta): ', true));
+if (!PROCONTACT_USUARIO || !PROCONTACT_SENHA) { console.error('Usuário e senha são obrigatórios.'); process.exit(1); }
 
 fs.mkdirSync('recon', { recursive: true });
 const browser = await chromium.launch({ headless: false, slowMo: 250 });
