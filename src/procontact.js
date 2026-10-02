@@ -86,6 +86,10 @@ export async function exportarRelatorio({ url, usuario, senha, periodo, equipe, 
       if (r.request().isNavigationRequest()) log(`rede: navegação ${new URL(r.url()).host} HTTP ${r.status()}`);
       else if (r.status() >= 400 && erros++ < 10) log(`rede: HTTP ${r.status()} em ${resumo(r.url())}`); // sem query string
     });
+    const pendentes = new Map();
+    page.on('request', (r) => pendentes.set(r, Date.now()));
+    page.on('requestfinished', (r) => pendentes.delete(r));
+    page.on('requestfailed', (r) => pendentes.delete(r));
     page.on('console', (m) => { if (m.type() === 'error' && consoles++ < 5) log(`console: ${m.text().replace(/\s+/g, ' ').slice(0, 140)}`); });
     page.on('pageerror', (e) => { if (consoles++ < 5) log(`erro na página: ${String(e.message).replace(/\s+/g, ' ').slice(0, 140)}`); });
     try {
@@ -99,6 +103,9 @@ export async function exportarRelatorio({ url, usuario, senha, periodo, equipe, 
       const visivel = await page.locator('body').innerText({ timeout: 3000 }).catch(() => '(sem corpo)');
       log(`tela: "${visivel.replace(/\s+/g, ' ').trim().slice(0, 200)}"`);
       log(`campos na tela: ${await page.locator('input').count().catch(() => '?')} inputs, ${await page.locator('button').count().catch(() => '?')} botões`);
+      // requisições que nunca terminaram (típico de servidor que descarta conexões de data center sem responder)
+      const penduradas = [...pendentes.entries()].map(([r, t]) => `${r.method()} ${r.resourceType()} ${resumo(r.url())} (${Math.round((Date.now() - t) / 1000)}s)`);
+      log(`requisições pendentes: ${penduradas.length}${penduradas.length ? ' — ' + penduradas.slice(0, 8).join(' | ') : ''}`);
       throw e;
     }
     await entrar(page, usuario, senha);
