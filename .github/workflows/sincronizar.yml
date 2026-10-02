@@ -36,6 +36,11 @@ jobs:
         run: |
           curl -sS -m 25 -o /dev/null -w "HTTP %{http_code} em %{time_total}s (conexão %{time_connect}s)\n" "$PROCONTACT_URL" || echo "SEM RESPOSTA em 25s (bloqueio de rede ou de IP)"
           echo "IP de saída do runner: $(curl -sS -m 10 https://api.ipify.org || echo desconhecido)"
+          # os arquivos que montam a tela: chegam (e em quanto tempo) ou ficam pendurados?
+          BASE="${PROCONTACT_URL%/pages/login}"
+          for A in /css/main.css /js/app.js /js/tinymce/js/tinymce/tinymce.min.js; do
+            curl -sS -m 70 -o /dev/null -w "ARQUIVO $A: HTTP %{http_code}, %{size_download} bytes em %{time_total}s\n" "$BASE$A" || echo "ARQUIVO $A: SEM RESPOSTA em 70s"
+          done
         continue-on-error: true
       - run: node src/main.js
         env:
