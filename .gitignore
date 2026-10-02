@@ -1,0 +1,6 @@
+node_modules/
+.env*
+*.xlsx
+*.csv
+test-results/
+playwright-report/
