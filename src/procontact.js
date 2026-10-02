@@ -81,12 +81,12 @@ export async function exportarRelatorio({ url, usuario, senha, periodo, equipe, 
     await abrirChamadasManuais(page);
     await definirPeriodo(page, periodo);
     await definirEquipe(page, equipe);
-    await page.getByRole('button', { name: /buscar/i }).click();
+    await page.getByRole('button', { name: /Buscar$/ }).click();
     await page.getByText('TOTAL', { exact: true }).first().waitFor({ timeout: TEMPO });
     await page.waitForLoadState('networkidle');
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 300_000 }),
-      page.getByRole('button', { name: /exportar/i }).click(),
+      page.getByRole('button', { name: /Exportar$/ }).click(),
     ]);
     const destino = path.join(pasta, 'relatorio');
     await download.saveAs(destino);
