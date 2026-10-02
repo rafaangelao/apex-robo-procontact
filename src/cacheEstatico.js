@@ -40,7 +40,7 @@ export async function obterEstatico({ url, pastaCache, fetchImpl = fetch, timeou
     fs.writeFileSync(path.join(pastaCache, `${chave}.bin`), body);
     fs.writeFileSync(path.join(pastaCache, `${chave}.json`), JSON.stringify({ etag, tipo }));
   }
-  return { status: r.status, body, tipo, origem: 'baixado' };
+  return { status: r.status, body, tipo, origem: 'baixado', guardado: Boolean(r.ok && etag) };
 }
 
 // Liga o cache ao contexto do Playwright: intercepta os GET de estáticos do host e responde com obterEstatico().
@@ -52,6 +52,7 @@ export async function instalarCache(ctx, { host, pastaCache, log = () => {} }) {
     try {
       const r = await obterEstatico({ url: req.url(), pastaCache });
       estat[r.origem === 'cache' ? 'cache' : 'baixados']++;
+      if (r.origem === 'baixado') log(`cache: baixado ${new URL(req.url()).pathname.slice(0, 70)} (${r.body.length} bytes, ${r.guardado ? 'guardado' : 'SEM ETag, não guardado'})`);
       return await route.fulfill({ status: r.status, contentType: r.tipo, body: r.body });
     } catch (e) {
       estat.falhas++;

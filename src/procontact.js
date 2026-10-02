@@ -113,19 +113,27 @@ export async function exportarRelatorio({ url, usuario, senha, periodo, equipe, 
       log(`requisições pendentes: ${penduradas.length}${penduradas.length ? ' — ' + penduradas.slice(0, 8).join(' | ') : ''}`);
       throw e;
     }
+    const t0 = Date.now();
+    const marca = (fase) => log(`tempo: ${fase} em ${Math.round((Date.now() - t0) / 1000)}s`);
+    marca('login (campo apareceu)');
     await entrar(page, usuario, senha);
+    marca('entrou');
     await abrirChamadasManuais(page);
+    marca('menu e filtros');
     await definirPeriodo(page, periodo);
     await definirEquipe(page, equipe);
+    marca('período e equipe');
     await page.getByRole('button', { name: /Buscar$/ }).click();
     await page.getByText(/^total$/i).first().waitFor({ timeout: TEMPO });
     await page.waitForLoadState('networkidle');
+    marca('busca concluída');
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 300_000 }),
       page.getByRole('button', { name: /Exportar$/ }).click(),
     ]);
     const destino = path.join(pasta, 'relatorio');
     await download.saveAs(destino);
+    marca('exportação baixada');
     return destino;
   } finally {
     log(`cache estático: ${cacheStat?.cache ?? 0} do cache, ${cacheStat?.baixados ?? 0} baixados, ${cacheStat?.falhas ?? 0} falhas`);
