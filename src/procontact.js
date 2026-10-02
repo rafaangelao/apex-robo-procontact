@@ -70,13 +70,26 @@ async function definirEquipe(page, equipe) {
   await page.getByRole('button', { name: new RegExp(nome, 'i') }).first().click();
 }
 
-export async function exportarRelatorio({ url, usuario, senha, periodo, equipe, pasta }) {
+export async function exportarRelatorio({ url, usuario, senha, periodo, equipe, pasta, log = () => {} }) {
   const browser = await chromium.launch({ headless: true });
   try {
     const ctx = await browser.newContext({ locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', acceptDownloads: true });
     const page = await ctx.newPage();
     page.setDefaultTimeout(TEMPO);
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    // Diagnóstico SEM dados: só host, status e tipo de falha (a tela de login do GitHub chegou a travar o evento
+    // domcontentloaded por 45 s mesmo com o endereço respondendo HTTP 200 a um curl).
+    let falhas = 0;
+    page.on('requestfailed', (r) => { if (falhas++ < 8) log(`rede: falhou ${new URL(r.url()).host} (${r.failure()?.errorText ?? '?'})`); });
+    page.on('response', (r) => { if (r.request().isNavigationRequest()) log(`rede: navegação ${new URL(r.url()).host} HTTP ${r.status()}`); });
+    try {
+      // 'commit' não espera os recursos da página; esperamos só o campo de login aparecer
+      await page.goto(url, { waitUntil: 'commit' });
+      await page.locator('input[name="login"]').waitFor({ timeout: TEMPO });
+    } catch (e) {
+      const titulo = (await page.title().catch(() => '?')).slice(0, 60);
+      log(`abertura: página em ${page.url() ? new URL(page.url()).host : '?'}, título "${titulo}"`);
+      throw e;
+    }
     await entrar(page, usuario, senha);
     await abrirChamadasManuais(page);
     await definirPeriodo(page, periodo);

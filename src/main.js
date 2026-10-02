@@ -33,7 +33,7 @@ export async function executar(cfg, io) {
   const pasta = io.pastaTemporaria();
   const chamarIngest = (corpo) => io.chamar({ url: cfg.ingestUrl, token: cfg.token, corpo });
   try {
-    const arquivo = await io.exportar({ url: cfg.procontactUrl, usuario: cfg.usuario, senha: cfg.senha, textoPeriodo: formatarTela(periodo), periodo, equipe: cfg.equipe ?? EQUIPE_PADRAO, pasta });
+    const arquivo = await io.exportar({ url: cfg.procontactUrl, usuario: cfg.usuario, senha: cfg.senha, textoPeriodo: formatarTela(periodo), periodo, equipe: cfg.equipe ?? EQUIPE_PADRAO, pasta, log: io.log });
     const p = parseRelatorio(lerPlanilha(io.ler(arquivo)));
     if (p.faltando.length) throw new Error('relatório sem as colunas: ' + p.faltando.join(', '));
     c.lidas = p.lidas; c.invalidas = p.invalidas; c.ignoradas_eagle = p.ignoradasEagle;
