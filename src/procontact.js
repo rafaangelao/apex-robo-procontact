@@ -80,7 +80,14 @@ export async function exportarRelatorio({ url, usuario, senha, periodo, equipe, 
     // domcontentloaded por 45 s mesmo com o endereço respondendo HTTP 200 a um curl).
     let falhas = 0;
     page.on('requestfailed', (r) => { if (falhas++ < 8) log(`rede: falhou ${new URL(r.url()).host} (${r.failure()?.errorText ?? '?'})`); });
-    page.on('response', (r) => { if (r.request().isNavigationRequest()) log(`rede: navegação ${new URL(r.url()).host} HTTP ${r.status()}`); });
+    let erros = 0, consoles = 0;
+    const resumo = (u) => { try { const x = new URL(u); return `${x.host}${x.pathname}`.slice(0, 90); } catch { return '?'; } };
+    page.on('response', (r) => {
+      if (r.request().isNavigationRequest()) log(`rede: navegação ${new URL(r.url()).host} HTTP ${r.status()}`);
+      else if (r.status() >= 400 && erros++ < 10) log(`rede: HTTP ${r.status()} em ${resumo(r.url())}`); // sem query string
+    });
+    page.on('console', (m) => { if (m.type() === 'error' && consoles++ < 5) log(`console: ${m.text().replace(/\s+/g, ' ').slice(0, 140)}`); });
+    page.on('pageerror', (e) => { if (consoles++ < 5) log(`erro na página: ${String(e.message).replace(/\s+/g, ' ').slice(0, 140)}`); });
     try {
       // 'commit' não espera os recursos da página; esperamos só o campo de login aparecer
       await page.goto(url, { waitUntil: 'commit' });
@@ -88,6 +95,10 @@ export async function exportarRelatorio({ url, usuario, senha, periodo, equipe, 
     } catch (e) {
       const titulo = (await page.title().catch(() => '?')).slice(0, 60);
       log(`abertura: página em ${page.url() ? new URL(page.url()).host : '?'}, título "${titulo}"`);
+      // a TELA DE LOGIN não tem dados de cliente: o texto visível ajuda a ver se é um aviso/bloqueio
+      const visivel = await page.locator('body').innerText({ timeout: 3000 }).catch(() => '(sem corpo)');
+      log(`tela: "${visivel.replace(/\s+/g, ' ').trim().slice(0, 200)}"`);
+      log(`campos na tela: ${await page.locator('input').count().catch(() => '?')} inputs, ${await page.locator('button').count().catch(() => '?')} botões`);
       throw e;
     }
     await entrar(page, usuario, senha);
