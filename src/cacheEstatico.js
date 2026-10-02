@@ -13,7 +13,8 @@ export function ehEstatico(u, host) {
   return u.host === host && EXT_ESTATICA.test(u.pathname);
 }
 
-const chaveDe = (url) => crypto.createHash('sha1').update(url).digest('hex');
+// A chave ignora a query string (o site pede app.js?v=<muda a cada carga>); quem valida o conteúdo é o ETag.
+const chaveDe = (url) => { const u = new URL(url); return crypto.createHash('sha1').update(u.host + u.pathname).digest('hex'); };
 
 function lerCache(pastaCache, chave) {
   try {

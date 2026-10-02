@@ -77,3 +77,14 @@ test('arquivo de cache corrompido: ignora o cache e baixa de novo', async () => 
   assert.equal(r.origem, 'baixado');
   assert.equal(s.chamadas[0].cond, null);
 });
+
+test('a mesma URL com parâmetro diferente (?v=...) usa o MESMO cache (o site muda o parâmetro a cada carga)', async () => {
+  const p = pasta();
+  await obterEstatico({ url: 'https://x/js/app.js?v=111', pastaCache: p, fetchImpl: servidor([resp(200, 'GRANDE', { etag: '"v1"', 'content-type': 'application/javascript' })]).fetchImpl });
+  const s = servidor([resp(304, '')]);
+  const r = await obterEstatico({ url: 'https://x/js/app.js?v=222', pastaCache: p, fetchImpl: s.fetchImpl });
+  assert.equal(r.origem, 'cache');
+  assert.equal(r.body.toString(), 'GRANDE');
+  assert.equal(s.chamadas[0].cond, '"v1"');
+  assert.equal(s.chamadas[0].url, 'https://x/js/app.js?v=222'); // a pergunta ao servidor mantém a URL pedida
+});
