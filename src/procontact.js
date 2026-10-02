@@ -40,13 +40,37 @@ export async function abrirChamadasManuais(page) {
   await page.getByText('Filtros').first().click(); // abre o painel de filtros, como na gravação (o texto traz um ícone junto)
 }
 
-// O período é escolhido por CLIQUES no calendário (o texto "01/10/2026 00:00 - 02/10/2026 23:59" não é um campo
-// digitável) e não há botão "Aplicar". Falta mapear o calendário: veja scripts/recon-calendario.js.
-async function definirPeriodo() {
-  throw new Error('seleção de datas pelo calendário ainda não implementada (aguarda o reconhecimento do calendário)');
+const dois = (n) => String(n).padStart(2, '0');
+const isoDia = (x) => `${x.y}-${dois(x.m)}-${dois(x.d)}`;
+const brDia = (x) => `${dois(x.d)}/${dois(x.m)}/${x.y}`;
+const RE_PERIODO = /\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}\s*-\s*\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}/;
+
+// Período: o texto "dd/mm/aaaa hh:mm - dd/mm/aaaa hh:mm" abre um seletor de datas (vue-daterange-picker, mapeado em
+// 02/10/2026 por scripts/recon-calendario.js) com dois calendários: mês anterior à esquerda, mês atual à direita.
+// Cada dia é um td[data-date="aaaa-mm-dd"]; os dias do mês vizinho levam a classe "off" e ficam de fora. Clicam-se
+// o dia inicial e o final (não há botão Aplicar; as horas ficam 00:00 e 23:59 por padrão).
+async function definirPeriodo(page, periodo) {
+  const campo = page.getByText(RE_PERIODO).first();
+  await campo.click();
+  const picker = page.locator('.daterangepicker');
+  await picker.waitFor({ state: 'visible' });
+  await picker.locator(`td[data-date="${isoDia(periodo.inicio)}"]:not(.off)`).first().click();
+  await picker.locator(`td[data-date="${isoDia(periodo.fim)}"]:not(.off)`).first().click();
+  await picker.waitFor({ state: 'hidden', timeout: 5_000 }).catch(async () => { await page.keyboard.press('Escape'); });
+  const texto = ((await campo.innerText()) || '').replace(/\s+/g, ' ').trim();
+  const esperado = `${brDia(periodo.inicio)} 00:00 - ${brDia(periodo.fim)}`;
+  if (!texto.startsWith(esperado)) throw new Error('o período no filtro não ficou como pedido (tela mudou?)');
 }
 
-export async function exportarRelatorio({ url, usuario, senha, textoPeriodo, pasta }) {
+// Filtro "Equipes" (5º campo "Selecione"; as opções são AQUISIÇÃO - CLARO/TIM/GANHO/PERDIDO). O Rafael sempre marca
+// AQUISIÇÃO - CLARO ao exportar; confirmado na gravação de 02/10/2026.
+async function definirEquipe(page, equipe) {
+  await page.getByRole('textbox', { name: 'Selecione' }).nth(4).click();
+  const nome = equipe.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  await page.getByRole('button', { name: new RegExp(nome, 'i') }).first().click();
+}
+
+export async function exportarRelatorio({ url, usuario, senha, periodo, equipe, pasta }) {
   const browser = await chromium.launch({ headless: true });
   try {
     const ctx = await browser.newContext({ locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', acceptDownloads: true });
@@ -55,7 +79,8 @@ export async function exportarRelatorio({ url, usuario, senha, textoPeriodo, pas
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     await entrar(page, usuario, senha);
     await abrirChamadasManuais(page);
-    await definirPeriodo(page, textoPeriodo);
+    await definirPeriodo(page, periodo);
+    await definirEquipe(page, equipe);
     await page.getByRole('button', { name: /buscar/i }).click();
     await page.getByText('TOTAL', { exact: true }).first().waitFor({ timeout: TEMPO });
     await page.waitForLoadState('networkidle');

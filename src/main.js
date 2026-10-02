@@ -11,6 +11,9 @@ import { chamar, enviarLotes } from './enviar.js';
 
 // Mensagem de erro segura para log e para ligacoes_sync_log (lido por admin/supervisor): o Playwright inclui o
 // "Call log" com os valores digitados (senha!) e URLs; aqui tiramos isso e mascaramos qualquer segredo conhecido.
+// Equipe do filtro "Equipes" do ProContact (a que o Rafael sempre marca ao exportar; as outras são TIM, GANHO, PERDIDO).
+export const EQUIPE_PADRAO = 'AQUISIÇÃO - CLARO';
+
 export function limparErro(e, segredos) {
   let msg = String((e && e.message) || e).split(/\n\s*Call log:/)[0];
   for (const s of segredos) if (s && String(s).length >= 3) msg = msg.split(String(s)).join('***');
@@ -30,7 +33,7 @@ export async function executar(cfg, io) {
   const pasta = io.pastaTemporaria();
   const chamarIngest = (corpo) => io.chamar({ url: cfg.ingestUrl, token: cfg.token, corpo });
   try {
-    const arquivo = await io.exportar({ url: cfg.procontactUrl, usuario: cfg.usuario, senha: cfg.senha, textoPeriodo: formatarTela(periodo), pasta });
+    const arquivo = await io.exportar({ url: cfg.procontactUrl, usuario: cfg.usuario, senha: cfg.senha, textoPeriodo: formatarTela(periodo), periodo, equipe: cfg.equipe ?? EQUIPE_PADRAO, pasta });
     const p = parseRelatorio(lerPlanilha(io.ler(arquivo)));
     if (p.faltando.length) throw new Error('relatório sem as colunas: ' + p.faltando.join(', '));
     c.lidas = p.lidas; c.invalidas = p.invalidas; c.ignoradas_eagle = p.ignoradasEagle;
@@ -74,6 +77,7 @@ async function main() {
     procontactUrl: env('PROCONTACT_URL'), usuario: env('PROCONTACT_USUARIO'), senha: env('PROCONTACT_SENHA'),
     ingestUrl: env('INGEST_URL'), token: env('INGEST_TOKEN'),
     modo: process.env.MODO === 'dry' ? 'dry' : 'real', forcar: process.env.FORCAR === 'true',
+    equipe: process.env.EQUIPE || EQUIPE_PADRAO,
   };
   const io = {
     exportar: exportarRelatorio, ler: (p) => fs.readFileSync(p), chamar, enviarLotes,

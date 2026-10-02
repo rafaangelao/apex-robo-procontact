@@ -154,3 +154,18 @@ test('relatório só com ligações da Eagle continua sendo sucesso (não é fal
   assert.equal(reg.chamar.at(-1).ok, true);
   assert.equal(reg.chamar.at(-1).ignoradas_eagle, 2);
 });
+
+// ---- período por cliques no calendário e filtro de equipe (02/10/2026) ----
+test('exportar recebe o período como datas (para clicar no calendário) e a equipe CLARO por padrão', async () => {
+  const { o, reg } = io();
+  await executar(cfg(), o);
+  const a = reg.exportar[0];
+  assert.deepEqual(a.periodo.inicio, { y: 2026, m: 9, d: 1, hh: 0, mm: 0 });
+  assert.deepEqual(a.periodo.fim, { y: 2026, m: 10, d: 2, hh: 23, mm: 59 });
+  assert.equal(a.equipe, 'AQUISIÇÃO - CLARO');
+});
+test('a equipe pode ser trocada pela configuração', async () => {
+  const { o, reg } = io();
+  await executar(cfg({ equipe: 'AQUISIÇÃO - TIM' }), o);
+  assert.equal(reg.exportar[0].equipe, 'AQUISIÇÃO - TIM');
+});
