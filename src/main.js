@@ -9,6 +9,14 @@ import { periodoDoRelatorio, formatarTela, paraIso } from './periodo.js';
 import { lerPlanilha, parseRelatorio } from './parse.js';
 import { chamar, enviarLotes } from './enviar.js';
 
+// Mensagem de erro segura para log e para ligacoes_sync_log (lido por admin/supervisor): o Playwright inclui o
+// "Call log" com os valores digitados (senha!) e URLs; aqui tiramos isso e mascaramos qualquer segredo conhecido.
+export function limparErro(e, segredos) {
+  let msg = String((e && e.message) || e).split(/\n\s*Call log:/)[0];
+  for (const s of segredos) if (s && String(s).length >= 3) msg = msg.split(String(s)).join('***');
+  return msg.replace(/\s+/g, ' ').trim().slice(0, 300);
+}
+
 export async function executar(cfg, io) {
   const agora = cfg.agora ?? new Date();
   if (!cfg.forcar && !dentroDoExpediente(agora)) {
@@ -27,6 +35,7 @@ export async function executar(cfg, io) {
     if (p.faltando.length) throw new Error('relatório sem as colunas: ' + p.faltando.join(', '));
     c.lidas = p.lidas; c.invalidas = p.invalidas; c.ignoradas_eagle = p.ignoradasEagle;
     io.log(`Lidas ${p.lidas}; válidas ${p.linhas.length}; inválidas ${p.invalidas}; ignoradas (Eagle) ${p.ignoradasEagle}.`);
+    if (p.linhas.length === 0 && p.invalidas > 0) throw new Error('nenhuma ligação válida no relatório (o formato mudou?)');
     if (cfg.modo === 'dry') {
       const { total } = await chamarIngest({ acao: 'contar', de: base.periodo_de, ate: base.periodo_ate });
       io.log(`Conferência (nada foi gravado): o arquivo tem ${p.linhas.length} ligações válidas; o banco tem ${total} no mesmo período.`);
@@ -40,11 +49,12 @@ export async function executar(cfg, io) {
     io.log(`Sincronizado: ${c.enviadas} ligações enviadas.`);
     return { codigo: 0, enviadas: c.enviadas };
   } catch (e) {
-    const msg = String((e && e.message) || e).slice(0, 300);
+    const segredos = [cfg.usuario, cfg.senha, cfg.procontactUrl, cfg.token, cfg.ingestUrl];
+    const msg = limparErro(e, segredos);
     io.log('ERRO: ' + msg);
     if (cfg.modo !== 'dry') {
       try { await chamarIngest({ acao: 'final', ...base, ok: false, ...c, erro: msg }); }
-      catch (e2) { io.log('Não foi possível registrar o erro: ' + String((e2 && e2.message) || e2).slice(0, 100)); }
+      catch (e2) { io.log('Não foi possível registrar o erro: ' + limparErro(e2, segredos).slice(0, 100)); }
     }
     return { codigo: 1 };
   } finally {

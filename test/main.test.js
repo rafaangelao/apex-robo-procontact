@@ -123,3 +123,34 @@ function semTelefone() {
   XLSX.utils.book_append_sheet(wb, ws, 'Worksheet');
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
+
+// ---- correções da revisão final (02/10/2026) ----
+import { planilha as planilhaFalsa } from './fixture.js';
+test('erro do Playwright com "Call log" não vaza usuário, senha nem URL no log nem no ligacoes_sync_log', async () => {
+  const msg = 'locator.fill: Timeout 45000ms exceeded for rafa.robo.\nCall log:\n  - fill("SeNhA-Secreta")\n  - navigating to "https://pc.exemplo.com/login"';
+  const { o, reg } = io({ async exportar() { throw new Error(msg); } });
+  const r = await executar(cfg({ usuario: 'rafa.robo', senha: 'SeNhA-Secreta', procontactUrl: 'https://pc.exemplo.com/login' }), o);
+  assert.equal(r.codigo, 1);
+  const fim = reg.chamar.at(-1);
+  const tudo = fim.erro + '\n' + reg.logs.join('\n');
+  for (const segredo of ['SeNhA-Secreta', 'rafa.robo', 'pc.exemplo.com', 'Call log']) assert.ok(!tudo.includes(segredo), 'vazou: ' + segredo);
+  assert.match(fim.erro, /Timeout/);
+});
+test('relatório com linhas mas NENHUMA válida (formato de data mudou) é erro, não sucesso silencioso', async () => {
+  const buf = planilhaFalsa([linha({ ID: '1', DataHora_Geracao: '2026/10/01 12:20' }), linha({ ID: '2', DataHora_Geracao: '2026/10/01 12:21' })]);
+  const { o, reg } = io({ ler: () => buf });
+  const r = await executar(cfg(), o);
+  assert.equal(r.codigo, 1);
+  const fim = reg.chamar.at(-1);
+  assert.equal(fim.ok, false);
+  assert.match(fim.erro, /nenhuma liga.{1,3}o v.lida/i);
+  assert.equal(reg.lotes.length, 0);
+});
+test('relatório só com ligações da Eagle continua sendo sucesso (não é falha de formato)', async () => {
+  const buf = planilhaFalsa([linha({ ID: '1', Usuario: 'eagle.a' }), linha({ ID: '2', Usuario: 'eagle.b' })]);
+  const { o, reg } = io({ ler: () => buf });
+  const r = await executar(cfg(), o);
+  assert.equal(r.codigo, 0);
+  assert.equal(reg.chamar.at(-1).ok, true);
+  assert.equal(reg.chamar.at(-1).ignoradas_eagle, 2);
+});

@@ -67,3 +67,30 @@ function XLSX_sem_coluna(col) {
   const rows = lerPlanilha(planilha([linha()]));
   return rows.map((o) => { const c = { ...o }; delete c[col]; return c; });
 }
+
+// ---- correções da revisão final (02/10/2026) ----
+import XLSX from 'xlsx';
+function xlsxDe(aoa) {
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Worksheet');
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
+test('telefone e ID guardados como NÚMERO na planilha não viram notação científica (igual ao upload manual: raw:true)', () => {
+  const buf = xlsxDe([
+    ['ID', 'Usuario', 'Telefone', 'Status', 'DataHora_Geracao', 'Tempo_Chamada'],
+    [1001, 'apex.a', 5511987654321, 'ANSWERED', '01/10/2026 12:20:59', '00:01:15'],
+  ]);
+  const r = parseRelatorio(lerPlanilha(buf));
+  assert.equal(r.faltando.length, 0);
+  assert.equal(r.linhas[0].id, 1001);
+  assert.equal(r.linhas[0].telefone, '5511987654321');
+});
+test('arquivo só com cabeçalho de OUTRO relatório: a coluna faltando é detectada mesmo sem linhas', () => {
+  const r = parseRelatorio(lerPlanilha(xlsxDe([['Foo', 'Bar']])));
+  assert.ok(r.faltando.length > 0);
+});
+test('arquivo totalmente vazio (sem cabeçalho) é erro de colunas, não sucesso', () => {
+  const r = parseRelatorio(lerPlanilha(xlsxDe([[]])));
+  assert.ok(r.faltando.length > 0);
+});

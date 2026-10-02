@@ -24,19 +24,27 @@ export function dataHora(v) {
 
 export const ehEagle = (usuario) => /^eagle/i.test(String(usuario || '').trim());
 
-// Primeira aba; cada linha vira {cabeçalho: texto}. raw:false mantém o texto como aparece no Excel.
+// Primeira aba; cada linha vira {cabeçalho: valor}. raw:true, IGUAL ao upload manual do painel (mlLinhasDoWorkbook):
+// com raw:false um telefone guardado como número viraria '5.51199E+12'. O array devolvido leva também .cabecalho
+// (nomes das colunas), para detectar relatório de outro formato mesmo quando não há nenhuma linha.
 export function lerPlanilha(buffer) {
   const wb = XLSX.read(buffer, { type: 'buffer' });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  return XLSX.utils.sheet_to_json(ws, { raw: false, defval: null });
+  const rows = XLSX.utils.sheet_to_json(ws, { raw: true, defval: null });
+  const cab = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null })[0];
+  rows.cabecalho = Array.isArray(cab) ? cab.filter((c) => c != null) : [];
+  return rows;
 }
 
 export function parseRelatorio(rows) {
   const out = { linhas: [], lidas: 0, invalidas: 0, ignoradasEagle: 0, faltando: [] };
-  if (!rows || !rows.length) return out; // relatório sem ligações no período: válido
+  // sem linhas: se sabemos o cabeçalho, confere as colunas (outro relatório não vira "sucesso com 0 linhas");
+  // sem nenhuma informação de cabeçalho, é só "sem ligações no período"
+  const colunas = rows && rows.length ? Object.keys(rows[0]) : (rows && Array.isArray(rows.cabecalho) ? rows.cabecalho : null);
+  if (colunas === null) return out;
   out.lidas = rows.length;
   const mapa = {};
-  Object.keys(rows[0]).forEach((k) => {
+  colunas.forEach((k) => {
     const n = normCol(k);
     Object.keys(COLUNAS).forEach((ch) => { if (COLUNAS[ch] === n && !(ch in mapa)) mapa[ch] = k; });
   });
