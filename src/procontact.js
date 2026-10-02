@@ -82,7 +82,7 @@ export async function exportarRelatorio({ url, usuario, senha, periodo, equipe, 
     await definirPeriodo(page, periodo);
     await definirEquipe(page, equipe);
     await page.getByRole('button', { name: /Buscar$/ }).click();
-    await page.getByText('TOTAL', { exact: true }).first().waitFor({ timeout: TEMPO });
+    await page.getByText(/^total$/i).first().waitFor({ timeout: TEMPO });
     await page.waitForLoadState('networkidle');
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 300_000 }),
