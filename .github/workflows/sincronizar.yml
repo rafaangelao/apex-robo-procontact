@@ -34,8 +34,7 @@ jobs:
         env:
           PROCONTACT_URL: ${{ secrets.PROCONTACT_URL }}
         run: |
-          curl -sS -m 25 -o /dev/null -w "HTTP %{http_code} em %{time_total}s (conexão %{time_connect}s)
-" "$PROCONTACT_URL" || echo "SEM RESPOSTA em 25s (bloqueio de rede ou de IP)"
+          curl -sS -m 25 -o /dev/null -w "HTTP %{http_code} em %{time_total}s (conexão %{time_connect}s)\n" "$PROCONTACT_URL" || echo "SEM RESPOSTA em 25s (bloqueio de rede ou de IP)"
           echo "IP de saída do runner: $(curl -sS -m 10 https://api.ipify.org || echo desconhecido)"
         continue-on-error: true
       - run: node src/main.js
