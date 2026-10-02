@@ -21,7 +21,7 @@ jobs:
     # a execução agendada só roda com a variável de repositório ROBO_ATIVO = true (é o "liga/desliga")
     if: github.event_name == 'workflow_dispatch' || vars.ROBO_ATIVO == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,20 +30,22 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Restaurar o cache dos arquivos estáticos do ProContact
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache-estatico
+          key: procontact-estatico-${{ github.run_id }}
+          restore-keys: procontact-estatico-
       - name: Diagnóstico de rede (a página de login do ProContact responde a partir do GitHub?)
         env:
           PROCONTACT_URL: ${{ secrets.PROCONTACT_URL }}
         run: |
           curl -sS -m 25 -o /dev/null -w "HTTP %{http_code} em %{time_total}s (conexão %{time_connect}s)\n" "$PROCONTACT_URL" || echo "SEM RESPOSTA em 25s (bloqueio de rede ou de IP)"
           echo "IP de saída do runner: $(curl -sS -m 10 https://api.ipify.org || echo desconhecido)"
-          # os arquivos que montam a tela: chegam (e em quanto tempo) ou ficam pendurados?
-          BASE="${PROCONTACT_URL%/pages/login}"
-          for A in /css/main.css /js/app.js /js/tinymce/js/tinymce/tinymce.min.js; do
-            curl -sS -m 70 -o /dev/null -w "ARQUIVO $A: HTTP %{http_code}, %{size_download} bytes em %{time_total}s\n" "$BASE$A" || echo "ARQUIVO $A: SEM RESPOSTA em 70s"
-          done
         continue-on-error: true
       - run: node src/main.js
         env:
+          PROCONTACT_TEMPO_MS: 300000
           MODO: ${{ github.event_name == 'workflow_dispatch' && (inputs.modo || 'dry') || 'real' }}
           FORCAR: ${{ github.event_name == 'workflow_dispatch' }}
           PROCONTACT_URL: ${{ secrets.PROCONTACT_URL }}
@@ -51,3 +53,9 @@ jobs:
           PROCONTACT_SENHA: ${{ secrets.PROCONTACT_SENHA }}
           INGEST_URL: ${{ secrets.INGEST_URL }}
           INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
+      - name: Guardar o cache dos arquivos estáticos (mesmo se o robô falhar)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache-estatico
+          key: procontact-estatico-${{ github.run_id }}

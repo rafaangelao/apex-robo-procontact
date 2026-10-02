@@ -2,8 +2,11 @@
 // Única peça que fala com o site do ProContact. Sem screenshots/traces (a tela mostra telefones).
 import path from 'node:path';
 import { chromium } from 'playwright';
+import { instalarCache } from './cacheEstatico.js';
 
-const TEMPO = 45_000;
+// Tempo-limite de cada passo. No GitHub o ProContact entrega ~70 KB/s e a 1ª execução (cache vazio) baixa ~17 MB:
+// o workflow sobe isto por PROCONTACT_TEMPO_MS; localmente 45 s bastam.
+const TEMPO = Number(process.env.PROCONTACT_TEMPO_MS) || 45_000;
 
 // Seletores confirmados na gravação de 02/10/2026 (codegen): campos input[name="login"] e input[name="password"],
 // botão "Entrar". Exportados também para o script de reconhecimento (scripts/recon-calendario.js).
@@ -72,8 +75,10 @@ async function definirEquipe(page, equipe) {
 
 export async function exportarRelatorio({ url, usuario, senha, periodo, equipe, pasta, log = () => {} }) {
   const browser = await chromium.launch({ headless: true });
+  let cacheStat = null;
   try {
     const ctx = await browser.newContext({ locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', acceptDownloads: true });
+    cacheStat = await instalarCache(ctx, { host: new URL(url).host, pastaCache: process.env.PROCONTACT_CACHE || '.cache-estatico', log });
     const page = await ctx.newPage();
     page.setDefaultTimeout(TEMPO);
     // Diagnóstico SEM dados: só host, status e tipo de falha (a tela de login do GitHub chegou a travar o evento
@@ -123,6 +128,7 @@ export async function exportarRelatorio({ url, usuario, senha, periodo, equipe, 
     await download.saveAs(destino);
     return destino;
   } finally {
+    log(`cache estático: ${cacheStat?.cache ?? 0} do cache, ${cacheStat?.baixados ?? 0} baixados, ${cacheStat?.falhas ?? 0} falhas`);
     await browser.close();
   }
 }
