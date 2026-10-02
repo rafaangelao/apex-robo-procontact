@@ -1,0 +1,41 @@
+name: Sincronizar chamadas manuais
+
+on:
+  schedule:
+    # 10:17 a 01:17 UTC = 07:17 a 22:17 em São Paulo; o próprio robô recusa domingo e fora de 07-22h.
+    - cron: '17 10-23,0-1 * * *'
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'dry = só confere (não grava); real = grava'
+        type: choice
+        options: [dry, real]
+        default: dry
+
+concurrency:
+  group: procontact
+  cancel-in-progress: false
+
+jobs:
+  sincronizar:
+    # a execução agendada só roda com a variável de repositório ROBO_ATIVO = true (é o "liga/desliga")
+    if: github.event_name == 'workflow_dispatch' || vars.ROBO_ATIVO == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: node src/main.js
+        env:
+          MODO: ${{ inputs.modo || 'real' }}
+          FORCAR: ${{ github.event_name == 'workflow_dispatch' }}
+          PROCONTACT_URL: ${{ secrets.PROCONTACT_URL }}
+          PROCONTACT_USUARIO: ${{ secrets.PROCONTACT_USUARIO }}
+          PROCONTACT_SENHA: ${{ secrets.PROCONTACT_SENHA }}
+          INGEST_URL: ${{ secrets.INGEST_URL }}
+          INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
