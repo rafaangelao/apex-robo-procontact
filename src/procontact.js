@@ -37,7 +37,7 @@ export async function abrirChamadasManuais(page) {
   }
   if (!(await visivel())) throw new Error('não achei o link "Chamadas Manuais" no menu (tela mudou?)');
   await link.click();
-  await page.getByText(/^filtros$/i).first().click(); // abre o painel de filtros, como na gravação
+  await page.getByText('Filtros').first().click(); // abre o painel de filtros, como na gravação (o texto traz um ícone junto)
 }
 
 // O período é escolhido por CLIQUES no calendário (o texto "01/10/2026 00:00 - 02/10/2026 23:59" não é um campo
