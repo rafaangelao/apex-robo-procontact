@@ -1,9 +1,8 @@
 name: Sincronizar chamadas manuais
 
 on:
-  schedule:
-    # 10:17 a 01:17 UTC = 07:17 a 22:17 em São Paulo; o próprio robô recusa domingo e fora de 07-22h.
-    - cron: '17 10-23,0-1 * * *'
+  # Sem schedule do GitHub: quem dispara de hora em hora é o pg_cron `robo-procontact-disparo` do Supabase
+  # (17 10-23,0-1 UTC = 07:17 a 22:17 em SP), via API com modo=real. O liga/desliga é esse job do pg_cron.
   workflow_dispatch:
     inputs:
       modo:
@@ -18,7 +17,7 @@ concurrency:
 
 jobs:
   sincronizar:
-    # a execução agendada só roda com a variável de repositório ROBO_ATIVO = true (é o "liga/desliga")
+    # ROBO_ATIVO só valia para o schedule do GitHub (removido); disparo manual/API sempre roda
     if: github.event_name == 'workflow_dispatch' || vars.ROBO_ATIVO == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
