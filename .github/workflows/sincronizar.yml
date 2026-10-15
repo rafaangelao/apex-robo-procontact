@@ -45,6 +45,8 @@ jobs:
       - run: node src/main.js
         env:
           PROCONTACT_TEMPO_MS: 300000
+          # ontem+hoje do discador passa de 60 mil linhas (50 colunas): o SheetJS precisa de mais memória que o padrão
+          NODE_OPTIONS: --max-old-space-size=4096
           MODO: ${{ github.event_name == 'workflow_dispatch' && (inputs.modo || 'dry') || 'real' }}
           FORCAR: ${{ github.event_name == 'workflow_dispatch' }}
           PROCONTACT_URL: ${{ secrets.PROCONTACT_URL }}
