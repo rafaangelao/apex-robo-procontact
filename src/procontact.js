@@ -161,7 +161,7 @@ async function exportar({ url, usuario, senha, pasta, log, relatorio, filtros, e
     await page.waitForLoadState('networkidle');
     marca('busca concluída');
     const [download] = await Promise.all([
-      page.waitForEvent('download', { timeout: 300_000 }),
+      page.waitForEvent('download', { timeout: 600_000 }), // o Excel do discador (ontem+hoje) levou ~285 s para ser gerado em 15/10
       page.getByRole('button', { name: /Exportar$/ }).click(),
     ]);
     const destino = path.join(pasta, 'relatorio');
