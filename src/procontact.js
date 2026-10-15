@@ -3,6 +3,7 @@
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { instalarCache } from './cacheEstatico.js';
+import { campanhaEscolhida } from './discador.js';
 
 // Tempo-limite de cada passo. No GitHub o ProContact entrega ~70 KB/s e a 1ª execução (cache vazio) baixa ~17 MB:
 // o workflow sobe isto por PROCONTACT_TEMPO_MS; localmente 45 s bastam.
@@ -28,7 +29,11 @@ export async function entrar(page, usuario, senha) {
 // getByText('Call Center').nth(4), frágil: aqui abrimos "Relatório" e vamos clicando nos "Call Center" (do último
 // para o primeiro) até o link ficar visível.
 export async function abrirChamadasManuais(page) {
-  const link = page.getByRole('link', { name: 'Chamadas Manuais' });
+  return abrirRelatorio(page, 'Chamadas Manuais');
+}
+// Mesmo caminho para qualquer relatório de Call Center. Nome EXATO: no menu também existe "CRM do Discador".
+export async function abrirRelatorio(page, nomeLink) {
+  const link = page.getByRole('link', { name: nomeLink, exact: true });
   const visivel = () => link.isVisible().catch(() => false);
   if (!(await visivel())) {
     await page.getByText('Relatório', { exact: true }).first().click();
@@ -38,7 +43,7 @@ export async function abrirChamadasManuais(page) {
       await page.waitForTimeout(300);
     }
   }
-  if (!(await visivel())) throw new Error('não achei o link "Chamadas Manuais" no menu (tela mudou?)');
+  if (!(await visivel())) throw new Error(`não achei o link "${nomeLink}" no menu (tela mudou?)`);
   await link.click();
   await page.getByText('Filtros').first().click(); // abre o painel de filtros, como na gravação (o texto traz um ícone junto)
 }
@@ -73,7 +78,34 @@ async function definirEquipe(page, equipe) {
   await page.getByRole('button', { name: new RegExp(nome, 'i') }).first().click();
 }
 
-export async function exportarRelatorio({ url, usuario, senha, periodo, equipe, pasta, log = () => {} }) {
+// Filtro "Campanha" do relatório do Discador: 4º "Selecione" (Status, Tentativa, Fila, Campanha — recon de 15/10/2026,
+// scripts/recon-discador.js). Marca TODAS as opções cujo nome começa por um dos prefixos (o mês muda no nome).
+async function definirCampanhas(page, prefixos, log) {
+  const caixa = page.getByRole('textbox', { name: 'Selecione' }).nth(3);
+  await caixa.click();
+  const opcoes = page.getByRole('button', { name: /check_circle/ });
+  await opcoes.first().waitFor();
+  const alvo = (await opcoes.allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim()).filter((t) => campanhaEscolhida(t, prefixos));
+  if (!alvo.length) throw new Error('nenhuma campanha do discador começa com os prefixos pedidos (tela mudou?)');
+  for (const t of alvo) {
+    if (!(await opcoes.first().isVisible().catch(() => false))) await caixa.click();
+    await page.getByRole('button', { name: t, exact: true }).first().click();
+    await page.waitForTimeout(200);
+  }
+  await page.keyboard.press('Escape');
+  log(`campanhas marcadas: ${alvo.length} (${alvo.map((t) => t.replace(/^check_circle\s*/, '')).join(' | ')})`);
+}
+
+export function exportarRelatorio({ url, usuario, senha, periodo, equipe, pasta, log = () => {} }) {
+  return exportar({ url, usuario, senha, pasta, log, relatorio: 'Chamadas Manuais', esperarTotal: true,
+    filtros: async (page) => { await definirPeriodo(page, periodo); await definirEquipe(page, equipe); } });
+}
+export function exportarDiscador({ url, usuario, senha, periodo, campanhas, pasta, log = () => {} }) {
+  return exportar({ url, usuario, senha, pasta, log, relatorio: 'Discador', esperarTotal: false,
+    filtros: async (page) => { await definirPeriodo(page, periodo); await definirCampanhas(page, campanhas, log); } });
+}
+
+async function exportar({ url, usuario, senha, pasta, log, relatorio, filtros, esperarTotal }) {
   const browser = await chromium.launch({ headless: true });
   let cacheStat = null;
   try {
@@ -118,13 +150,14 @@ export async function exportarRelatorio({ url, usuario, senha, periodo, equipe, 
     marca('login (campo apareceu)');
     await entrar(page, usuario, senha);
     marca('entrou');
-    await abrirChamadasManuais(page);
-    marca('menu e filtros');
-    await definirPeriodo(page, periodo);
-    await definirEquipe(page, equipe);
-    marca('período e equipe');
+    await abrirRelatorio(page, relatorio);
+    marca(`menu e filtros (${relatorio})`);
+    await filtros(page);
+    marca('filtros aplicados');
     await page.getByRole('button', { name: /Buscar$/ }).click();
-    await page.getByText(/^total$/i).first().waitFor({ timeout: TEMPO });
+    // nas manuais a busca termina quando aparece o rodapé "total"; no discador (ainda sem esse sinal confirmado)
+    // espera a rede assentar — o ensaio local (scripts/ensaio-discador.js) confirma
+    if (esperarTotal) await page.getByText(/^total$/i).first().waitFor({ timeout: TEMPO });
     await page.waitForLoadState('networkidle');
     marca('busca concluída');
     const [download] = await Promise.all([

@@ -52,6 +52,12 @@ jobs:
           PROCONTACT_SENHA: ${{ secrets.PROCONTACT_SENHA }}
           INGEST_URL: ${{ secrets.INGEST_URL }}
           INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
+          # Discador (REGRAS §87/§89): só roda com a variável do repositório DISCADOR_ATIVO=true; campanhas pelo começo do
+          # nome (variável DISCADOR_CAMPANHAS; vazio = DISCADOR-APEX-,MIGRACAO-CLARO). Falha aqui não muda as manuais.
+          DISCADOR_ATIVO: ${{ vars.DISCADOR_ATIVO }}
+          DISCADOR_CAMPANHAS: ${{ vars.DISCADOR_CAMPANHAS }}
+          INGEST_DISCADOR_URL: ${{ secrets.INGEST_DISCADOR_URL }}
+          INGEST_DISCADOR_TOKEN: ${{ secrets.INGEST_DISCADOR_TOKEN }}
       - name: Guardar o cache dos arquivos estáticos (mesmo se o robô falhar)
         if: always()
         uses: actions/cache/save@v4

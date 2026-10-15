@@ -8,17 +8,13 @@ import { dentroDoExpediente } from './expediente.js';
 import { periodoDoRelatorio, formatarTela, paraIso } from './periodo.js';
 import { lerPlanilha, parseRelatorio } from './parse.js';
 import { chamar, enviarLotes } from './enviar.js';
+import { limparErro } from './erro.js'; // mensagem de erro sem senha/token/"Call log" (também usada pelo discador)
+import { executarDiscador } from './discador.js';
 
-// Mensagem de erro segura para log e para ligacoes_sync_log (lido por admin/supervisor): o Playwright inclui o
-// "Call log" com os valores digitados (senha!) e URLs; aqui tiramos isso e mascaramos qualquer segredo conhecido.
+export { limparErro };
+
 // Equipe do filtro "Equipes" do ProContact (a que o Rafael sempre marca ao exportar; as outras são TIM, GANHO, PERDIDO).
 export const EQUIPE_PADRAO = 'AQUISIÇÃO - CLARO';
-
-export function limparErro(e, segredos) {
-  let msg = String((e && e.message) || e).split(/\n\s*Call log:/)[0];
-  for (const s of segredos) if (s && String(s).length >= 3) msg = msg.split(String(s)).join('***');
-  return msg.replace(/\s+/g, ' ').trim().slice(0, 300);
-}
 
 export async function executar(cfg, io) {
   const agora = cfg.agora ?? new Date();
@@ -72,21 +68,33 @@ function env(k) {
 }
 
 async function main() {
-  const { exportarRelatorio } = await import('./procontact.js'); // import tardio: os testes não precisam do Playwright
+  const { exportarRelatorio, exportarDiscador } = await import('./procontact.js'); // import tardio: os testes não precisam do Playwright
   const cfg = {
     procontactUrl: env('PROCONTACT_URL'), usuario: env('PROCONTACT_USUARIO'), senha: env('PROCONTACT_SENHA'),
     ingestUrl: env('INGEST_URL'), token: env('INGEST_TOKEN'),
     modo: process.env.MODO === 'dry' ? 'dry' : 'real', forcar: process.env.FORCAR === 'true',
     equipe: process.env.EQUIPE || EQUIPE_PADRAO,
+    // Discador (REGRAS §87/§89): liga/desliga pela variável DISCADOR_ATIVO, sem mexer em código
+    discadorAtivo: process.env.DISCADOR_ATIVO === 'true',
+    discadorUrl: process.env.INGEST_DISCADOR_URL, discadorToken: process.env.INGEST_DISCADOR_TOKEN,
+    campanhas: process.env.DISCADOR_CAMPANHAS || undefined,
   };
   const io = {
-    exportar: exportarRelatorio, ler: (p) => fs.readFileSync(p), chamar, enviarLotes,
+    exportar: exportarRelatorio, exportarDiscador, ler: (p) => fs.readFileSync(p), chamar, enviarLotes,
     uuid: () => crypto.randomUUID(),
     pastaTemporaria: () => fs.mkdtempSync(path.join(os.tmpdir(), 'procontact-')),
     limpar: (p) => fs.rmSync(p, { recursive: true, force: true }),
     log: (m) => console.log(m),
   };
   const r = await executar(cfg, io);
+  // Discador DEPOIS das manuais e isolado: a falha fica em discador_sync_log e não muda o código de saída das manuais
+  if (!r.pulou && cfg.discadorAtivo) {
+    if (!cfg.discadorUrl || !cfg.discadorToken) console.log('AVISO: DISCADOR_ATIVO=true sem INGEST_DISCADOR_URL/INGEST_DISCADOR_TOKEN; o discador não rodou.');
+    else {
+      const rd = await executarDiscador(cfg, io);
+      if (rd.codigo !== 0) console.log('AVISO: o discador falhou nesta execução (ver discador_sync_log); as chamadas manuais não foram afetadas.');
+    }
+  }
   process.exit(r.codigo);
 }
 

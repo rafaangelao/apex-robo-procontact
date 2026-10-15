@@ -24,3 +24,14 @@ export function formatarTela(p) {
 export function paraIso(x, seg = '00') {
   return `${x.y}-${dois(x.m)}-${dois(x.d)}T${dois(x.hh)}:${dois(x.mm)}:${seg}-03:00`;
 }
+
+// Discador (REGRAS §87): ontem 00:00 até hoje 23:59 (São Paulo). O robô reenvia esses dois dias a cada hora
+// (upsert por id): pega a tabulação feita depois da hora e a virada do dia; o relatório do mês inteiro é pesado demais.
+export function periodoDiscador(agora = new Date()) {
+  const { y, m, d } = partesSP(agora);
+  const ontem = new Date(Date.UTC(y, m - 1, d) - 86_400_000);
+  return {
+    inicio: { y: ontem.getUTCFullYear(), m: ontem.getUTCMonth() + 1, d: ontem.getUTCDate(), hh: 0, mm: 0 },
+    fim: { y, m, d, hh: 23, mm: 59 },
+  };
+}
