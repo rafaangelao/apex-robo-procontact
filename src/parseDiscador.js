@@ -1,6 +1,6 @@
 // src/parseDiscador.js
 // Leitor do relatório do DISCADOR automático (Relatório → Call Center → Discador → Exportar; dialer_calls_report_*.xlsx).
-// Spec: apex-smart-solutions docs/superpowers/specs/2026-10-14-discador-visao-supervisao-design.md (§82).
+// Spec: apex-smart-solutions docs/superpowers/specs/2026-10-14-discador-visao-supervisao-design.md (§87).
 // O layout tem colunas quase homônimas: "Data/Hora Fim" (UTC) × "DataHora_Fim" (São Paulo), "Tempo Total" (segundos) ×
 // "Tempo_Total" (hh:mm:ss) e duas "Região". Por isso o casamento usa normExata, que mantém o "_".
 // Nome (Nome/Desc) e CPF (Documento 1) NUNCA são lidos.
