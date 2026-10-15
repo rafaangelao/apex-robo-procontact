@@ -17,8 +17,7 @@ fs.mkdirSync('recon', { recursive: true });
 // tudo o que é impresso também vai para recon/discador-resumo.txt (o Claude lê dali; recon/ está no .gitignore)
 fs.writeFileSync('recon/discador-resumo.txt', '');
 const logOriginal = console.log;
-console.log = (...a) => { logOriginal(...a); fs.appendFileSync('recon/discador-resumo.txt', a.join(' ') + '
-'); };
+console.log = (...a) => { logOriginal(...a); fs.appendFileSync('recon/discador-resumo.txt', a.join(' ') + '\n'); };
 const browser = await chromium.launch({ headless: false, slowMo: 200 });
 const salvar = async (page, nome) => {
   fs.writeFileSync(`recon/${nome}.html`, await page.locator('body').innerHTML());
