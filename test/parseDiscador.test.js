@@ -71,3 +71,9 @@ test('planilha vazia com cabeçalho certo → 0 linhas, sem faltando', () => {
   const r = ler([]);
   assert.deepEqual(r, { linhas: [], lidas: 0, invalidas: 0, faltando: [] });
 });
+test('tempo fora do formato hh:mm:ss vira null (não 0), para não puxar a média para baixo', () => {
+  const l = ler([linhaDiscador({ [COL['Tempo_Chamada']]: 0.0010185, [COL['Tempo_Espera']]: 'abc', [COL['Tempo_Total']]: '00:01:40' })]).linhas[0];
+  assert.equal(l.seg_falados, null);
+  assert.equal(l.seg_espera, null);
+  assert.equal(l.seg_total, 100);
+});

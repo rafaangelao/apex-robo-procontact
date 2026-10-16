@@ -40,7 +40,8 @@ export function parseDiscador(rows) {
     return null;
   };
   const inteiro = (r, campo) => { const t = txt(r, campo); const n = Number(t); return t != null && Number.isInteger(n) ? n : null; };
-  const seg = (r, campo) => (txt(r, campo) == null ? null : segundos(txt(r, campo)));
+  // só "h:mm:ss" vira segundos; qualquer outro formato (ex.: fração de dia do Excel) vira null, não 0
+  const seg = (r, campo) => { const t = txt(r, campo); return t != null && /^\d+:\d{2}:\d{2}$/.test(t) ? segundos(t) : null; };
   const digitos = (r, campo) => { const d = (txt(r, campo) || '').replace(/\D/g, ''); return d || null; };
 
   const vistos = new Set();

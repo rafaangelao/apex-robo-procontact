@@ -18,6 +18,7 @@ const iniciou = new Date().toISOString();
 const p = parseDiscador(lerPlanilha(fs.readFileSync(arquivo)));
 if (p.faltando.length) { console.error('Relatório em outro formato; faltam:', p.faltando.join(', ')); process.exit(1); }
 const conta = (f) => p.linhas.reduce((m, l) => (m[f(l)] = (m[f(l)] || 0) + 1, m), {});
+if (!p.linhas.length) { console.error(`Nenhuma chamada válida no arquivo (lidas ${p.lidas}, inválidas ${p.invalidas}); nada a enviar.`); process.exit(1); }
 const datas = p.linhas.map((l) => l.gerada_em).sort();
 const de = datas[0];
 const ate = datas[datas.length - 1];
