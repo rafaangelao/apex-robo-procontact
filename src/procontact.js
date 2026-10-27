@@ -93,7 +93,8 @@ async function definirCampanhas(page, prefixos, log) {
     await page.waitForTimeout(200);
   }
   await page.keyboard.press('Escape');
-  log(`campanhas marcadas: ${alvo.length} (${alvo.map((t) => t.replace(/^check_circle\s*/, '')).join(' | ')})`);
+  // só a contagem: o repositório é público e os logs também (nome de campanha fica fora)
+  log(`campanhas marcadas: ${alvo.length}`);
 }
 
 export function exportarRelatorio({ url, usuario, senha, periodo, equipe, pasta, log = () => {} }) {
@@ -115,12 +116,15 @@ async function exportar({ url, usuario, senha, pasta, log, relatorio, filtros, e
     page.setDefaultTimeout(TEMPO);
     // Diagnóstico SEM dados: só host, status e tipo de falha (a tela de login do GitHub chegou a travar o evento
     // domcontentloaded por 45 s mesmo com o endereço respondendo HTTP 200 a um curl).
+    // O host do ProContact sai como "procontact": o repositório é público e os logs do Actions também.
+    const hostPc = new URL(url).host;
+    const nomeHost = (h) => (h === hostPc ? 'procontact' : h);
     let falhas = 0;
-    page.on('requestfailed', (r) => { if (falhas++ < 8) log(`rede: falhou ${new URL(r.url()).host} (${r.failure()?.errorText ?? '?'})`); });
+    page.on('requestfailed', (r) => { if (falhas++ < 8) log(`rede: falhou ${nomeHost(new URL(r.url()).host)} (${r.failure()?.errorText ?? '?'})`); });
     let erros = 0, consoles = 0;
-    const resumo = (u) => { try { const x = new URL(u); return `${x.host}${x.pathname}`.slice(0, 90); } catch { return '?'; } };
+    const resumo = (u) => { try { const x = new URL(u); return `${nomeHost(x.host)}${x.pathname}`.slice(0, 90); } catch { return '?'; } };
     page.on('response', (r) => {
-      if (r.request().isNavigationRequest()) log(`rede: navegação ${new URL(r.url()).host} HTTP ${r.status()}`);
+      if (r.request().isNavigationRequest()) log(`rede: navegação ${nomeHost(new URL(r.url()).host)} HTTP ${r.status()}`);
       else if (r.status() >= 400 && erros++ < 10) log(`rede: HTTP ${r.status()} em ${resumo(r.url())}`); // sem query string
     });
     const pendentes = new Map();
@@ -135,7 +139,7 @@ async function exportar({ url, usuario, senha, pasta, log, relatorio, filtros, e
       await page.locator('input[name="login"]').waitFor({ timeout: TEMPO });
     } catch (e) {
       const titulo = (await page.title().catch(() => '?')).slice(0, 60);
-      log(`abertura: página em ${page.url() ? new URL(page.url()).host : '?'}, título "${titulo}"`);
+      log(`abertura: página em ${page.url() ? nomeHost(new URL(page.url()).host) : '?'}, título "${titulo}"`);
       // a TELA DE LOGIN não tem dados de cliente: o texto visível ajuda a ver se é um aviso/bloqueio
       const visivel = await page.locator('body').innerText({ timeout: 3000 }).catch(() => '(sem corpo)');
       log(`tela: "${visivel.replace(/\s+/g, ' ').trim().slice(0, 200)}"`);

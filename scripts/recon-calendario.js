@@ -16,7 +16,7 @@ function perguntar(texto, oculto = false) {
     rl.question(texto, (r) => { rl.close(); if (oculto) process.stdout.write('\n'); resolve(r); });
   });
 }
-const PROCONTACT_URL = process.env.PROCONTACT_URL || 'https://eaglesales.procontact.com.br/pages/login';
+const PROCONTACT_URL = process.env.PROCONTACT_URL || (await perguntar('Endereço de login do ProContact: ')).trim();
 const PROCONTACT_USUARIO = process.env.PROCONTACT_USUARIO || (await perguntar('Usuário do ProContact: ')).trim();
 const PROCONTACT_SENHA = process.env.PROCONTACT_SENHA || (await perguntar('Senha (oculta): ', true));
 if (!PROCONTACT_USUARIO || !PROCONTACT_SENHA) { console.error('Usuário e senha são obrigatórios.'); process.exit(1); }

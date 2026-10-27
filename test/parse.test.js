@@ -30,7 +30,7 @@ test('cabeçalho com UniqueID duplicado não atrapalha', () => {
   assert.equal(ler([linha()]).linhas.length, 1);
 });
 test('eagle.* e " EAGLE.x " ficam fora e são contados; apex.eagleton entra', () => {
-  const r = ler([linha({ ID: '1', Usuario: 'eagle.juliana' }), linha({ ID: '2', Usuario: ' EAGLE.Maria ' }), linha({ ID: '3', Usuario: 'apex.eagleton' })]);
+  const r = ler([linha({ ID: '1', Usuario: 'eagle.fulana' }), linha({ ID: '2', Usuario: ' EAGLE.Beltrana ' }), linha({ ID: '3', Usuario: 'apex.eagleton' })]);
   assert.equal(r.ignoradasEagle, 2);
   assert.deepEqual(r.linhas.map((l) => l.id), [3]);
 });

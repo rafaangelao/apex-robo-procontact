@@ -11,7 +11,7 @@ import { periodoDoRelatorio, formatarTela } from '../src/periodo.js';
 import { lerPlanilha, parseRelatorio } from '../src/parse.js';
 import { EQUIPE_PADRAO } from '../src/main.js';
 
-const url = process.env.PROCONTACT_URL || 'https://eaglesales.procontact.com.br/pages/login';
+const url = process.env.PROCONTACT_URL || (await perguntar('Endereço de login do ProContact: ')).trim();
 const usuario = process.env.PROCONTACT_USUARIO || (await perguntar('Usuário do ProContact: ')).trim();
 const senha = process.env.PROCONTACT_SENHA || (await perguntar('Senha (oculta): ', true));
 const periodo = periodoDoRelatorio();

@@ -8,7 +8,7 @@ import { chromium } from 'playwright';
 import { perguntar } from './prompt.js';
 import { entrar } from '../src/procontact.js';
 
-const url = process.env.PROCONTACT_URL || 'https://eaglesales.procontact.com.br/pages/login';
+const url = process.env.PROCONTACT_URL || (await perguntar('Endereço de login do ProContact: ')).trim();
 const usuario = process.env.PROCONTACT_USUARIO || (await perguntar('Usuário do ProContact: ')).trim();
 const senha = process.env.PROCONTACT_SENHA || (await perguntar('Senha (oculta): ', true));
 if (!usuario || !senha) { console.error('Usuário e senha são obrigatórios.'); process.exit(1); }
