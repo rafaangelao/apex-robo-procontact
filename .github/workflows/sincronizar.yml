@@ -1,8 +1,9 @@
 name: Sincronizar chamadas manuais
 
 on:
-  # Sem schedule do GitHub: quem dispara de hora em hora é o pg_cron `robo-procontact-disparo` do Supabase
-  # (17 10-23,0-1 UTC = 07:17 a 22:17 em SP), via API com modo=real. O liga/desliga é esse job do pg_cron.
+  # Sem schedule do GitHub: quem dispara é o pg_cron do Supabase, via API com modo=real. O liga/desliga são esses jobs.
+  # - robo-procontact-disparo (minuto 17, de hora em hora): rodada completa = manuais do mês inteiro + discador
+  # - robo-procontact-rapido (minutos 02, 32 e 47): rapido=sim = só as manuais de hoje, sem o discador (~2 min)
   workflow_dispatch:
     inputs:
       modo:
@@ -10,6 +11,11 @@ on:
         type: choice
         options: [dry, real]
         default: dry
+      rapido:
+        description: 'sim = só as chamadas manuais de hoje, sem o discador (rodada de 15 em 15 min)'
+        type: choice
+        options: [nao, sim]
+        default: nao
 
 concurrency:
   group: procontact
@@ -49,6 +55,7 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
           MODO: ${{ github.event_name == 'workflow_dispatch' && (inputs.modo || 'dry') || 'real' }}
           FORCAR: ${{ github.event_name == 'workflow_dispatch' }}
+          RAPIDO: ${{ inputs.rapido || 'nao' }}
           PROCONTACT_URL: ${{ secrets.PROCONTACT_URL }}
           PROCONTACT_USUARIO: ${{ secrets.PROCONTACT_USUARIO }}
           PROCONTACT_SENHA: ${{ secrets.PROCONTACT_SENHA }}

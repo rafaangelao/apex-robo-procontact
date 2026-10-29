@@ -15,6 +15,13 @@ export function periodoDoRelatorio(agora = new Date()) {
   return { inicio: { y: iy, m: im, d: 1, hh: 0, mm: 0 }, fim: { y, m, d, hh: 23, mm: 59 } };
 }
 
+// Rodada rápida (de 15 em 15 min): só hoje 00:00 até hoje 23:59 (São Paulo). O mês inteiro (ligação registrada com
+// atraso, virada de mês) continua na rodada completa, de hora em hora.
+export function periodoHoje(agora = new Date()) {
+  const { y, m, d } = partesSP(agora);
+  return { inicio: { y, m, d, hh: 0, mm: 0 }, fim: { y, m, d, hh: 23, mm: 59 } };
+}
+
 // Formato do filtro "Período" da tela do ProContact: "01/09/2026 00:00 - 01/10/2026 23:59"
 export function formatarTela(p) {
   const f = (x) => `${dois(x.d)}/${dois(x.m)}/${x.y} ${dois(x.hh)}:${dois(x.mm)}`;

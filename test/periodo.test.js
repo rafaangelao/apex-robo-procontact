@@ -25,3 +25,11 @@ test('paraIso usa -03:00 e aceita segundos', () => {
   assert.equal(paraIso(p.inicio), '2026-10-01T00:00:00-03:00');
   assert.equal(paraIso(p.fim, '59'), '2026-10-15T23:59:59-03:00');
 });
+
+// ---- rodada rápida das chamadas manuais (28/10/2026): só o dia de hoje ----
+test('periodoHoje: hoje 00:00 até hoje 23:59 (São Paulo), inclusive no dia 1', async () => {
+  const { periodoHoje } = await import('../src/periodo.js');
+  assert.equal(formatarTela(periodoHoje(new Date('2026-10-15T15:00:00Z'))), '15/10/2026 00:00 - 15/10/2026 23:59');
+  assert.equal(formatarTela(periodoHoje(new Date('2026-10-01T15:00:00Z'))), '01/10/2026 00:00 - 01/10/2026 23:59');
+  assert.equal(formatarTela(periodoHoje(new Date('2026-10-01T02:00:00Z'))), '30/09/2026 00:00 - 30/09/2026 23:59');
+});

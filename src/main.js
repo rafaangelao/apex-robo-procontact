@@ -5,7 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { dentroDoExpediente } from './expediente.js';
-import { periodoDoRelatorio, formatarTela, paraIso } from './periodo.js';
+import { periodoDoRelatorio, periodoHoje, formatarTela, paraIso } from './periodo.js';
 import { lerPlanilha, parseRelatorio } from './parse.js';
 import { chamar, enviarLotes } from './enviar.js';
 import { limparErro } from './erro.js'; // mensagem de erro sem senha/token/"Call log" (também usada pelo discador)
@@ -16,14 +16,20 @@ export { limparErro };
 // Equipe do filtro "Equipes" do ProContact (a que o Rafael sempre marca ao exportar; as outras são TIM, GANHO, PERDIDO).
 export const EQUIPE_PADRAO = 'AQUISIÇÃO - CLARO';
 
+// O discador (pesado: ~6 min) só roda na rodada completa, de hora em hora; a rápida (15 em 15 min) é só das manuais.
+export function rodaDiscador(cfg, r) {
+  return !r.pulou && cfg.discadorAtivo && !cfg.rapido;
+}
+
 export async function executar(cfg, io) {
   const agora = cfg.agora ?? new Date();
-  if (!cfg.forcar && !dentroDoExpediente(agora)) {
+  // A rápida respeita o expediente mesmo forçada: o disparo pela API (pg_cron) sempre chega com FORCAR=true
+  if ((cfg.rapido || !cfg.forcar) && !dentroDoExpediente(agora)) {
     io.log('Fora do expediente (07h-22h, seg-sáb, horário de São Paulo): nada a fazer.');
     return { codigo: 0, pulou: true };
   }
   const execucaoId = io.uuid();
-  const periodo = periodoDoRelatorio(agora);
+  const periodo = cfg.rapido ? periodoHoje(agora) : periodoDoRelatorio(agora);
   const base = { execucao_id: execucaoId, iniciou_em: agora.toISOString(), periodo_de: paraIso(periodo.inicio), periodo_ate: paraIso(periodo.fim, '59') };
   const c = { lidas: 0, enviadas: 0, invalidas: 0, ignoradas_eagle: 0 };
   const pasta = io.pastaTemporaria();
@@ -73,6 +79,8 @@ async function main() {
     procontactUrl: env('PROCONTACT_URL'), usuario: env('PROCONTACT_USUARIO'), senha: env('PROCONTACT_SENHA'),
     ingestUrl: env('INGEST_URL'), token: env('INGEST_TOKEN'),
     modo: process.env.MODO === 'dry' ? 'dry' : 'real', forcar: process.env.FORCAR === 'true',
+    // Rodada rápida (pg_cron robo-procontact-rapido, de 15 em 15 min): só as manuais de hoje, sem o discador
+    rapido: process.env.RAPIDO === 'sim',
     equipe: process.env.EQUIPE || EQUIPE_PADRAO,
     // Discador (REGRAS §87/§89): liga/desliga pela variável DISCADOR_ATIVO, sem mexer em código
     discadorAtivo: process.env.DISCADOR_ATIVO === 'true',
@@ -88,7 +96,7 @@ async function main() {
   };
   const r = await executar(cfg, io);
   // Discador DEPOIS das manuais e isolado: a falha fica em discador_sync_log e não muda o código de saída das manuais
-  if (!r.pulou && cfg.discadorAtivo) {
+  if (rodaDiscador(cfg, r)) {
     if (!cfg.discadorUrl || !cfg.discadorToken) console.log('AVISO: DISCADOR_ATIVO=true sem INGEST_DISCADOR_URL/INGEST_DISCADOR_TOKEN; o discador não rodou.');
     else {
       const rd = await executarDiscador(cfg, io);

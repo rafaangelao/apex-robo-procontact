@@ -169,3 +169,27 @@ test('a equipe pode ser trocada pela configuração', async () => {
   await executar(cfg({ equipe: 'AQUISIÇÃO - TIM' }), o);
   assert.equal(reg.exportar[0].equipe, 'AQUISIÇÃO - TIM');
 });
+
+// ---- rodada rápida (28/10/2026): de 15 em 15 min, só as manuais de hoje; o mês inteiro fica na rodada de hora em hora ----
+test('rápida: exporta e registra só o dia de hoje', async () => {
+  const { o, reg } = io();
+  const r = await executar(cfg({ rapido: true }), o);
+  assert.equal(r.codigo, 0);
+  assert.equal(reg.exportar[0].textoPeriodo, '02/10/2026 00:00 - 02/10/2026 23:59');
+  const fim = reg.chamar.at(-1);
+  assert.equal(fim.periodo_de, '2026-10-02T00:00:00-03:00');
+  assert.equal(fim.periodo_ate, '2026-10-02T23:59:59-03:00');
+});
+test('rápida: fora do expediente não acessa o ProContact, mesmo disparada pela API (forçar)', async () => {
+  const { o, reg } = io();
+  const r = await executar(cfg({ rapido: true, forcar: true, agora: DOMINGO }), o);
+  assert.equal(r.pulou, true);
+  assert.equal(reg.exportar.length, 0);
+});
+test('discador só roda na rodada completa (não na rápida) e quando está ligado', async () => {
+  const { rodaDiscador } = await import('../src/main.js');
+  assert.equal(rodaDiscador({ discadorAtivo: true, rapido: false }, { codigo: 0 }), true);
+  assert.equal(rodaDiscador({ discadorAtivo: true, rapido: true }, { codigo: 0 }), false);
+  assert.equal(rodaDiscador({ discadorAtivo: false, rapido: false }, { codigo: 0 }), false);
+  assert.equal(rodaDiscador({ discadorAtivo: true, rapido: false }, { codigo: 0, pulou: true }), false);
+});
