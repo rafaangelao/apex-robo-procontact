@@ -36,7 +36,14 @@ export async function executar(cfg, io) {
   const chamarIngest = (corpo) => io.chamar({ url: cfg.ingestUrl, token: cfg.token, corpo });
   try {
     const arquivo = await io.exportar({ url: cfg.procontactUrl, usuario: cfg.usuario, senha: cfg.senha, textoPeriodo: formatarTela(periodo), periodo, equipe: cfg.equipe ?? EQUIPE_PADRAO, pasta, log: io.log });
-    const p = parseRelatorio(lerPlanilha(io.ler(arquivo)));
+    const rows = lerPlanilha(io.ler(arquivo));
+    const p = parseRelatorio(rows);
+    // Na rápida (só hoje), dia sem nenhuma manual ainda (madrugada, sábado) faz o ProContact exportar um arquivo sem
+    // linhas e sem o cabeçalho certo: é "0 ligações", não erro. A completa (mês inteiro) segue tratando como erro.
+    if (p.faltando.length && cfg.rapido && rows.length === 0) {
+      io.log(`Relatório de hoje vazio (${rows.cabecalho.length} células no topo): nenhuma ligação manual hoje ainda.`);
+      p.faltando = [];
+    }
     if (p.faltando.length) throw new Error('relatório sem as colunas: ' + p.faltando.join(', '));
     c.lidas = p.lidas; c.invalidas = p.invalidas; c.ignoradas_eagle = p.ignoradasEagle;
     io.log(`Lidas ${p.lidas}; válidas ${p.linhas.length}; inválidas ${p.invalidas}; ignoradas (Eagle) ${p.ignoradasEagle}.`);

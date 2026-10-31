@@ -193,3 +193,32 @@ test('discador só roda na rodada completa (não na rápida) e quando está liga
   assert.equal(rodaDiscador({ discadorAtivo: false, rapido: false }, { codigo: 0 }), false);
   assert.equal(rodaDiscador({ discadorAtivo: true, rapido: false }, { codigo: 0, pulou: true }), false);
 });
+
+// ---- 31/10/2026: dia sem nenhuma manual ainda (madrugada, sábado) faz o ProContact exportar arquivo vazio ----
+function xlsxDe(aoa) {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Worksheet');
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
+test('rápida: arquivo vazio = 0 ligações hoje, sai 0 e registra o final ok', async () => {
+  for (const aoa of [[[]], [['Nenhum registro encontrado']]]) {
+    const { o, reg } = io({ ler: () => xlsxDe(aoa) });
+    const r = await executar(cfg({ rapido: true }), o);
+    assert.equal(r.codigo, 0);
+    assert.equal(reg.lotes.length, 0);
+    const fim = reg.chamar.at(-1);
+    assert.equal(fim.ok, true);
+    assert.equal(fim.lidas, 0);
+  }
+});
+test('completa: arquivo vazio continua sendo erro (proteção contra mudança de formato)', async () => {
+  const { o, reg } = io({ ler: () => xlsxDe([[]]) });
+  const r = await executar(cfg(), o);
+  assert.equal(r.codigo, 1);
+  assert.equal(reg.chamar.at(-1).ok, false);
+});
+test('rápida: arquivo com linhas mas sem as colunas certas continua sendo erro', async () => {
+  const { o } = io({ ler: () => xlsxDe([['Foo', 'Bar'], ['1', '2']]) });
+  const r = await executar(cfg({ rapido: true }), o);
+  assert.equal(r.codigo, 1);
+});
