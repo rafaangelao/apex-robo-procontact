@@ -30,7 +30,14 @@ export async function executarDiscador(cfg, io) {
   try {
     const campanhas = prefixosCampanhas(cfg.campanhas);
     const arquivo = await io.exportarDiscador({ url: cfg.procontactUrl, usuario: cfg.usuario, senha: cfg.senha, textoPeriodo: formatarTela(periodo), periodo, campanhas, pasta, log: io.log });
-    const p = parseDiscador(lerPlanilha(io.ler(arquivo)));
+    const rows = lerPlanilha(io.ler(arquivo));
+    const p = parseDiscador(rows);
+    // Ontem+hoje sem nenhuma chamada (domingo, segunda cedo) faz o ProContact exportar um arquivo sem linhas e sem o
+    // cabeçalho certo: é "0 chamadas", não erro. Arquivo COM linhas e sem as colunas segue sendo erro de formato.
+    if (p.faltando.length && rows.length === 0) {
+      io.log(`Discador: relatório vazio (${rows.cabecalho.length} células no topo): nenhuma chamada ontem nem hoje.`);
+      p.faltando = [];
+    }
     if (p.faltando.length) throw new Error('relatório do discador sem as colunas: ' + p.faltando.join(', '));
     c.lidas = p.lidas; c.invalidas = p.invalidas;
     io.log(`Discador: lidas ${p.lidas}; válidas ${p.linhas.length}; inválidas ${p.invalidas}.`);

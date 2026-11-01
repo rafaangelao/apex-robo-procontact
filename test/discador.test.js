@@ -93,3 +93,15 @@ test('executarDiscador: relatório de outro formato é erro (não "0 linhas")', 
   assert.equal(r.codigo, 1);
   assert.match(reg.chamar.at(-1).corpo.erro, /colunas/);
 });
+// 01/11/2026: ontem+hoje sem chamada (domingo, segunda cedo) → o ProContact exporta arquivo vazio
+test('executarDiscador: arquivo vazio = 0 chamadas, final ok', async () => {
+  for (const aoa of [[[]], [['Nenhum registro encontrado']]]) {
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'x');
+    const { o, reg } = io({ ler: () => XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) });
+    const r = await executarDiscador(cfg(), o);
+    assert.equal(r.codigo, 0);
+    const fim = reg.chamar.at(-1).corpo;
+    assert.equal(fim.ok, true);
+    assert.equal(fim.lidas, 0);
+  }
+});
