@@ -16,6 +16,13 @@ test('periodoDiscador: dia 1 começa no último dia do mês anterior', () => {
   assert.equal(formatarTela(periodoDiscador(new Date('2027-01-01T13:00:00Z'))), '31/12/2026 00:00 - 01/01/2027 23:59');
 });
 
+test('periodoDiscador: discador_dia recupera só aquele dia; formato errado é erro', () => {
+  assert.equal(formatarTela(periodoDiscador(QUINTA_15H, '2026-11-03')), '03/11/2026 00:00 - 03/11/2026 23:59');
+  assert.equal(formatarTela(periodoDiscador(QUINTA_15H, '')), '14/10/2026 00:00 - 15/10/2026 23:59');
+  assert.throws(() => periodoDiscador(QUINTA_15H, '03/11/2026'), /discador_dia inválido/);
+  assert.throws(() => periodoDiscador(QUINTA_15H, '2026-02-30'), /discador_dia inválido/);
+});
+
 test('prefixosCampanhas: padrão Apex + Campinas; lista da variável sem espaços vazios', () => {
   assert.deepEqual(prefixosCampanhas(undefined), ['DISCADOR-APEX-', 'MIGRACAO-CLARO']);
   assert.deepEqual(prefixosCampanhas(' A , ,B '), ['A', 'B']);

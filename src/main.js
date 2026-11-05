@@ -93,6 +93,8 @@ async function main() {
     discadorAtivo: process.env.DISCADOR_ATIVO === 'true',
     discadorUrl: process.env.INGEST_DISCADOR_URL, discadorToken: process.env.INGEST_DISCADOR_TOKEN,
     campanhas: process.env.DISCADOR_CAMPANHAS || undefined,
+    // Recuperar um dia do discador (entrada discador_dia, AAAA-MM-DD); vazio = ontem+hoje
+    discadorDia: process.env.DISCADOR_DIA || '',
   };
   const io = {
     exportar: exportarRelatorio, exportarDiscador, ler: (p) => fs.readFileSync(p), chamar, enviarLotes,

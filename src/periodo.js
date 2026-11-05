@@ -34,7 +34,14 @@ export function paraIso(x, seg = '00') {
 
 // Discador (REGRAS §87): ontem 00:00 até hoje 23:59 (São Paulo). O robô reenvia esses dois dias a cada hora
 // (upsert por id): pega a tabulação feita depois da hora e a virada do dia; o relatório do mês inteiro é pesado demais.
-export function periodoDiscador(agora = new Date()) {
+// `dia` (AAAA-MM-DD, entrada discador_dia do workflow): recuperar um dia que ficou sem sincronizar, só aquele dia.
+export function periodoDiscador(agora = new Date(), dia = '') {
+  if (dia) {
+    const [, y, m, d] = String(dia).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/) ?? [];
+    const data = y && new Date(Date.UTC(+y, +m - 1, +d));
+    if (!data || data.getUTCMonth() !== +m - 1 || data.getUTCDate() !== +d) throw new Error(`discador_dia inválido: "${dia}" (use AAAA-MM-DD)`);
+    return { inicio: { y: +y, m: +m, d: +d, hh: 0, mm: 0 }, fim: { y: +y, m: +m, d: +d, hh: 23, mm: 59 } };
+  }
   const { y, m, d } = partesSP(agora);
   const ontem = new Date(Date.UTC(y, m - 1, d) - 86_400_000);
   return {

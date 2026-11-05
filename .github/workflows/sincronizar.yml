@@ -16,6 +16,10 @@ on:
         type: choice
         options: [nao, sim]
         default: nao
+      discador_dia:
+        description: 'recuperar o discador de um dia (AAAA-MM-DD); vazio = ontem+hoje. Use com rapido=nao'
+        type: string
+        default: ''
 
 concurrency:
   group: procontact
@@ -65,6 +69,7 @@ jobs:
           # nome (variável DISCADOR_CAMPANHAS; vazio = DISCADOR-APEX-,MIGRACAO-CLARO). Falha aqui não muda as manuais.
           DISCADOR_ATIVO: ${{ vars.DISCADOR_ATIVO }}
           DISCADOR_CAMPANHAS: ${{ vars.DISCADOR_CAMPANHAS }}
+          DISCADOR_DIA: ${{ inputs.discador_dia || '' }}
           INGEST_DISCADOR_URL: ${{ secrets.INGEST_DISCADOR_URL }}
           INGEST_DISCADOR_TOKEN: ${{ secrets.INGEST_DISCADOR_TOKEN }}
       - name: Guardar o cache dos arquivos estáticos (mesmo se o robô falhar)

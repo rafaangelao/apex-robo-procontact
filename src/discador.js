@@ -21,7 +21,7 @@ export function campanhaEscolhida(texto, prefixos) {
 
 export async function executarDiscador(cfg, io) {
   const agora = cfg.agora ?? new Date();
-  const periodo = periodoDiscador(agora);
+  const periodo = periodoDiscador(agora, cfg.discadorDia);
   const execucaoId = io.uuid();
   const base = { execucao_id: execucaoId, iniciou_em: agora.toISOString(), periodo_de: paraIso(periodo.inicio), periodo_ate: paraIso(periodo.fim, '59') };
   const c = { lidas: 0, enviadas: 0, invalidas: 0 };
