@@ -38,7 +38,13 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # --with-deps usa o apt do Ubuntu; em 11/11 o GitHub ficou 2h30 sem resolver os
+      # servidores do Ubuntu e o robô parou. A máquina já tem as bibliotecas do Chrome,
+      # então, se o apt falhar ou passar de 2 min, instala só o Chromium e segue.
+      - name: Instalar o Chromium do Playwright
+        run: |
+          timeout -k 10 120 npx playwright install --with-deps chromium \
+            || { echo "::warning::apt falhou ou demorou; instalando só o Chromium"; npx playwright install chromium; }
       - name: Restaurar o cache dos arquivos estáticos do ProContact
         uses: actions/cache/restore@v4
         with:
