@@ -1,4 +1,4 @@
-// src/socios/main.js — rodada do robô de sócios (§155): pega a fila na ingest-socios, consulta a Nova Vida, devolve.
+// src/socios/main.js — rodada do robô de sócios (§156): pega a fila na ingest-socios, consulta a Nova Vida, devolve.
 // Log público: só contagens. Disparado pelo workflow socios.yml (quem dispara é a RPC socios_pedir).
 import { pathToFileURL } from 'node:url';
 import { chamar } from '../enviar.js';

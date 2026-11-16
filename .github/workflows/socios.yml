@@ -1,7 +1,7 @@
 name: Consultar sócios na Nova Vida
 
 # Sem schedule: quem dispara é a RPC socios_pedir (Supabase, pg_net) via API, um disparo por pedido.
-# §155 — spec docs/superpowers/specs/2026-11-16-consulta-socios-renovacao-design.md (repo oficial)
+# §156 — spec docs/superpowers/specs/2026-11-16-consulta-socios-renovacao-design.md (repo oficial)
 on:
   workflow_dispatch:
 

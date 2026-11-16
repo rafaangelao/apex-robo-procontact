@@ -1,4 +1,4 @@
-// src/socios/ler-socios.js — interpreta o texto das páginas da Nova Vida (§155). Funções puras, sem Playwright.
+// src/socios/ler-socios.js — interpreta o texto das páginas da Nova Vida (§156). Funções puras, sem Playwright.
 export const TETO_TELEFONES = 5;
 const MAX_FONES = 10;
 const OPERADORAS = new Set(['CLARO', 'VIVO', 'TIM', 'OI', 'NEXTEL', 'ALGAR', 'SERCOMTEL', 'CTBC', 'EMBRATEL', 'GVT']);

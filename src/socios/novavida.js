@@ -1,4 +1,4 @@
-// src/socios/novavida.js — navegação no Congonhas (Nova Vida TI). §155, spec seções 3 e 5.3.
+// src/socios/novavida.js — navegação no Congonhas (Nova Vida TI). §156, spec seções 3 e 5.3.
 // Só navega e devolve TEXTO BRUTO; quem interpreta é ler-socios.js. Nunca loga nada.
 const INICIO = 'https://congonhas.novavidatec.com.br/';
 const HOST = 'congonhas.novavidatec.com.br';
