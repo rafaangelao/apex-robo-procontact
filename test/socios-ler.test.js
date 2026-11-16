@@ -46,3 +46,10 @@ test('paraResultado: tira o indice e mantém o formato da spec', () => {
     { nome: 'ZZ', cpf: '12345678909', participacao: null, telefones_consultados: false, telefones: [] });
   assert.equal(TETO_TELEFONES, 5);
 });
+test('cartaoTemCpf (usado na página): aceita CPF só dígitos e formatado, como lerCartaoSocio', async () => {
+  const { cartaoTemCpf } = await import('../src/socios/novavida.js');
+  assert.equal(cartaoTemCpf('ZZ\n12345678909\nParticipação'), true);
+  assert.equal(cartaoTemCpf('ZZ\n123.456.789-09\nParticipação'), true);
+  assert.equal(cartaoTemCpf('ZZ\n50.00%\nParticipação'), false);
+  assert.equal(cartaoTemCpf('ZZ\n(11) 90000-0001'), false);
+});

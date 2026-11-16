@@ -7,10 +7,12 @@ import { lerCartaoSocio, ordenarSocios, lerTelefones, paraResultado, TETO_TELEFO
 
 const ERRO_LOGIN = 'Falha no login da Nova Vida.';
 const ERRO_CONSULTA = 'A consulta na Nova Vida falhou.';
+const ERRO_TEMPO = 'A consulta não terminou a tempo.';
 
+// Falha de navegação lança (vira erro); "sem_socios" só quando a página de Sócios abriu e não tem cartão.
 export async function consultarUm(nav, cnpj) {
-  if (!(await nav.buscarCnpj(cnpj))) return { status: 'sem_socios' };
-  if (!(await nav.abrirSocios())) return { status: 'sem_socios' };
+  await nav.buscarCnpj(cnpj);
+  await nav.abrirSocios();
   const socios = ordenarSocios((await nav.lerCartoes()).map((t, i) => lerCartaoSocio(t, i)).filter(Boolean));
   if (!socios.length) return { status: 'sem_socios' };
   for (const s of socios.slice(0, TETO_TELEFONES)) {
@@ -27,6 +29,28 @@ function comTempo(promessa, ms) {
   return Promise.race([promessa, limite]).finally(() => clearTimeout(timer));
 }
 
+// Envia o resultado de um pedido sem derrubar a rodada: se a Edge recusar (400/409/rede), tenta gravar como erro.
+// Devolve o status que valeu para a contagem.
+async function enviarSeguro(io, cfg, corpo, cnpj) {
+  try { await io.enviar(corpo); return corpo.status; } catch (e) {
+    io.log('socios: envio recusado: ' + limparErro(e, [...cfg.segredos, cnpj]));
+    if (corpo.status !== 'erro') {
+      try { await io.enviar({ id: corpo.id, status: 'erro', erro: ERRO_CONSULTA }); } catch (e2) {
+        io.log('socios: envio do erro também falhou: ' + limparErro(e2, [...cfg.segredos, cnpj]));
+      }
+    }
+    return 'erro';
+  }
+}
+
+// Depois de um tempo esgotado: fecha a página da consulta velha (que pode seguir rodando) e abre outra na mesma sessão.
+async function trocarNavegador(io, cfg, sessao) {
+  const velho = sessao.nav;
+  sessao.nav = null;
+  await velho.fechar().catch(() => {});
+  try { sessao.nav = await sessao.novoNav(); } catch (e) { io.log('socios: não abriu página nova: ' + limparErro(e, cfg.segredos)); }
+}
+
 export async function executar(cfg, io) {
   const t0 = io.agora();
   const cont = { pedidos: 0, pronto: 0, sem_socios: 0, erro: 0 };
@@ -40,23 +64,29 @@ export async function executar(cfg, io) {
       if (!sessao) {
         try { sessao = await io.abrirSessao(); } catch (e) {
           io.log('socios: falha no login: ' + limparErro(e, cfg.segredos));
-          for (const p of lote) await io.enviar({ id: p.id, status: 'erro', erro: ERRO_LOGIN });
+          for (const p of lote) await enviarSeguro(io, cfg, { id: p.id, status: 'erro', erro: ERRO_LOGIN }, p.cnpj);
           cont.erro += lote.length;
           codigo = 1;
           break;
         }
       }
       for (const p of lote) {
+        // teto conferido antes de cada CNPJ: o que sobrar vira erro (o consultor pode pedir de novo)
+        if (io.agora() - t0 >= cfg.tetoRodadaMs) {
+          cont[await enviarSeguro(io, cfg, { id: p.id, status: 'erro', erro: ERRO_TEMPO }, p.cnpj)]++;
+          continue;
+        }
         let r;
         try {
+          if (!sessao.nav) throw new Error('sem página aberta');
           r = await comTempo(consultarUm(sessao.nav, p.cnpj), cfg.tempoPorCnpjMs);
         } catch (e) {
           io.log('socios: uma consulta falhou: ' + limparErro(e, [...cfg.segredos, p.cnpj]));
           r = { status: 'erro', erro: ERRO_CONSULTA };
-          await sessao.nav.reiniciar().catch(() => {});
+          if (sessao.nav) await trocarNavegador(io, cfg, sessao);
+          else { try { sessao.nav = await sessao.novoNav(); } catch { /* segue sem página: próximos viram erro */ } }
         }
-        await io.enviar({ id: p.id, ...r });
-        cont[r.status]++;
+        cont[await enviarSeguro(io, cfg, { id: p.id, ...r }, p.cnpj)]++;
       }
     }
   } finally {
@@ -77,7 +107,8 @@ async function main() {
   const { criarNavegador } = await import('./novavida.js');
   const cred = { usuario: env('NOVAVIDA_USUARIO'), senha: env('NOVAVIDA_SENHA'), cliente: env('NOVAVIDA_EMPRESA') };
   const ingest = { url: env('INGEST_SOCIOS_URL'), token: env('INGEST_SOCIOS_TOKEN') };
-  const cfg = { tetoRodadaMs: 8 * 60_000, tempoPorCnpjMs: 60_000, segredos: [cred.usuario, cred.senha, cred.cliente, ingest.token] };
+  // teto de 7 min (conferido antes de cada CNPJ): 7 + 60 s do CNPJ + ~65 s da página nova cabem no timeout de 10 min do job
+  const cfg = { tetoRodadaMs: 7 * 60_000, tempoPorCnpjMs: 60_000, segredos: [cred.usuario, cred.senha, cred.cliente, ingest.token] };
   const io = {
     pegar: async (max) => ((await chamar({ ...ingest, corpo: { acao: 'pegar', max } })).pedidos || []),
     enviar: (corpo) => chamar({ ...ingest, corpo: { acao: 'resultado', ...corpo } }),
@@ -87,7 +118,8 @@ async function main() {
         const context = await browser.newContext({ locale: 'pt-BR', timezoneId: 'America/Sao_Paulo' });
         const nav = await criarNavegador(context);
         await nav.entrar(cred);
-        return { nav, fechar: () => browser.close() };
+        const novoNav = async () => { const n = await criarNavegador(context); await n.irParaBusca(); return n; };
+        return { nav, novoNav, fechar: () => browser.close() };
       } catch (e) { await browser.close().catch(() => {}); throw e; }
     },
     agora: () => Date.now(),

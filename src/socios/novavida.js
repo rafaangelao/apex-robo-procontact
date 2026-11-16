@@ -1,12 +1,22 @@
 // src/socios/novavida.js — navegação no Congonhas (Nova Vida TI). §156, spec seções 3 e 5.3.
 // Só navega e devolve TEXTO BRUTO; quem interpreta é ler-socios.js. Nunca loga nada.
+// Cada navegador é dono de UMA página (const): depois de um tempo esgotado o main fecha este e pede outro,
+// e a consulta velha que ainda estiver rodando só consegue falhar na página fechada.
+import { LINHA_CPF_FONTE } from './ler-socios.js';
+
 const INICIO = 'https://congonhas.novavidatec.com.br/';
 const HOST = 'congonhas.novavidatec.com.br';
 const BUSCA = 'Digite o CPF ou CNPJ';
 
-// Roda no navegador: marca os cartões de sócio (menor elemento com CPF de 11 dígitos numa linha e "Participação").
-function marcarCartoesNaPagina() {
-  const temCpf = (t) => /(^|\n)\s*\d{11}\s*(\n|$)/.test(t);
+// Mesma regra de CPF do ler-socios.js (linha só com dígitos/pontos/traço e 11 dígitos), para testar fora da página.
+export function cartaoTemCpf(texto, fonte = LINHA_CPF_FONTE) {
+  const re = new RegExp(fonte);
+  return String(texto ?? '').split('\n').some((l) => { const x = l.trim(); return re.test(x) && x.replace(/\D/g, '').length === 11; });
+}
+// Roda no navegador (não enxerga o módulo): marca os cartões de sócio = menor elemento com uma linha de CPF e "Participação".
+function marcarCartoesNaPagina(fonte) {
+  const re = new RegExp(fonte);
+  const temCpf = (t) => t.split('\n').some((l) => { const x = l.trim(); return re.test(x) && x.replace(/\D/g, '').length === 11; });
   const todos = [...document.querySelectorAll('body *')]
     .filter((e) => { const t = e.innerText || ''; return t.includes('Participação') && temCpf(t); });
   const minimos = todos.filter((e) => !todos.some((o) => o !== e && e.contains(o)));
@@ -23,7 +33,7 @@ function secaoNaPagina([titulo, outro]) {
 }
 
 export async function criarNavegador(context) {
-  let page = await context.newPage();
+  const page = await context.newPage();
   const nav = {
     async entrar({ usuario, senha, cliente }) {
       // Entrar pelo Congonhas: ele redireciona ao login com o token p=… (direto no /Auth/Login dá "Sessão expirada")
@@ -38,29 +48,31 @@ export async function criarNavegador(context) {
       await page.waitForURL((u) => u.hostname === HOST, { timeout: 30000 });
       await page.getByPlaceholder(BUSCA).first().waitFor({ state: 'visible', timeout: 20000 });
     },
+    // Navegador novo na mesma sessão (cookies do contexto): só vai para a tela de busca.
+    async irParaBusca() {
+      await page.goto(INICIO, { waitUntil: 'networkidle', timeout: 45000 });
+      await page.getByPlaceholder(BUSCA).first().waitFor({ state: 'visible', timeout: 20000 });
+    },
+    // Falha (lança) se a empresa não abrir: tempo esgotado NÃO pode virar "sem sócios".
     async buscarCnpj(cnpj) {
       const antes = page.url();
       const caixa = page.getByPlaceholder(BUSCA).first();
       await caixa.fill('');
       await caixa.pressSequentially(cnpj, { delay: 30 }); // a máscara do campo formata sozinha
       await caixa.press('Enter');
-      try {
-        await page.waitForURL((u) => u.href !== antes && /\/Pj\/Cadastro/i.test(u.pathname), { timeout: 20000 });
-        return true;
-      } catch { return false; }
+      await page.waitForURL((u) => u.href !== antes && /\/Pj\/Cadastro/i.test(u.pathname), { timeout: 20000 });
     },
     async abrirSocios() {
       await page.locator('a', { hasText: /^\s*Sócios\s*$/ }).first().click({ timeout: 10000 });
-      try { await page.waitForURL(/\/Pj\/Socios/i, { timeout: 15000 }); } catch { return false; }
+      await page.waitForURL(/\/Pj\/Socios/i, { timeout: 15000 });
       await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-      return true;
     },
     async lerCartoes() {
-      return page.evaluate(marcarCartoesNaPagina);
+      return page.evaluate(marcarCartoesNaPagina, LINHA_CPF_FONTE);
     },
     async lerPessoa(indice) {
       const socios = page.url();
-      await page.evaluate(marcarCartoesNaPagina); // a página pode ter sido redesenhada ao voltar
+      await page.evaluate(marcarCartoesNaPagina, LINHA_CPF_FONTE); // a página pode ter sido redesenhada ao voltar
       await page.locator(`[data-apex-socio="${indice}"]`).locator('button, a').first().click({ timeout: 10000 });
       await page.waitForURL(/\/Pf\/Cadastro/i, { timeout: 20000 });
       await page.getByText('Celulares', { exact: true }).first().waitFor({ timeout: 15000 }).catch(() => {});
@@ -70,12 +82,8 @@ export async function criarNavegador(context) {
       if (!/\/Pj\/Socios/i.test(page.url())) await page.goto(socios, { waitUntil: 'networkidle', timeout: 20000 });
       return { fixos, celulares };
     },
-    // Depois de um timeout: descarta a página (a consulta velha pode continuar rodando nela) e abre outra na mesma sessão.
-    async reiniciar() {
-      await page.close().catch(() => {});
-      page = await context.newPage();
-      await page.goto(INICIO, { waitUntil: 'networkidle', timeout: 45000 });
-      await page.getByPlaceholder(BUSCA).first().waitFor({ state: 'visible', timeout: 20000 });
+    async fechar() {
+      await page.close();
     },
   };
   return nav;

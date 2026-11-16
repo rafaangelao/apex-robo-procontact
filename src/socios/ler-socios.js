@@ -3,7 +3,8 @@ export const TETO_TELEFONES = 5;
 const MAX_FONES = 10;
 const OPERADORAS = new Set(['CLARO', 'VIVO', 'TIM', 'OI', 'NEXTEL', 'ALGAR', 'SERCOMTEL', 'CTBC', 'EMBRATEL', 'GVT']);
 const ICONE = /^(?=.*[a-z])[a-z0-9_]+$/;            // ligadura de ícone (ex.: person_search); exige letra para não engolir o CPF
-const LINHA_CPF = /^[\d.\-\s]+$/;
+export const LINHA_CPF_FONTE = String.raw`^[\d.\-\s]+$`;   // a mesma regra é usada na página (novavida.js)
+const LINHA_CPF = new RegExp(LINHA_CPF_FONTE);
 const FONE = /^\(?(\d{2})\)?\s*(\d{4,5})-?(\d{4})\b/;
 
 const linhas = (t) => String(t ?? '').split('\n').map((l) => l.trim()).filter((l) => l && !ICONE.test(l));
