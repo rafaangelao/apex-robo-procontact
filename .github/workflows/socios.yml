@@ -1,0 +1,43 @@
+name: Consultar sócios na Nova Vida
+
+# Sem schedule: quem dispara é a RPC socios_pedir (Supabase, pg_net) via API, um disparo por pedido.
+# §155 — spec docs/superpowers/specs/2026-11-16-consulta-socios-renovacao-design.md (repo oficial)
+on:
+  workflow_dispatch:
+
+# Um por vez: dois logins simultâneos do mesmo usuário derrubam um ao outro. Cada rodada esvazia a fila,
+# então o disparo que o GitHub descartar (máx. 1 rodando + 1 esperando) não perde pedido.
+concurrency:
+  group: novavida
+  cancel-in-progress: false
+
+jobs:
+  socios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Cache do Chromium do Playwright
+        id: cache-pw
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Instalar o Chromium do Playwright
+        if: steps.cache-pw.outputs.cache-hit != 'true'
+        run: |
+          timeout -k 10 120 npx playwright install --with-deps chromium \
+            || { echo "::warning::apt falhou ou demorou; instalando só o Chromium"; npx playwright install chromium; }
+      - name: Consultar a fila
+        env:
+          NOVAVIDA_USUARIO: ${{ secrets.NOVAVIDA_USUARIO }}
+          NOVAVIDA_SENHA: ${{ secrets.NOVAVIDA_SENHA }}
+          NOVAVIDA_EMPRESA: ${{ secrets.NOVAVIDA_EMPRESA }}
+          INGEST_SOCIOS_URL: ${{ secrets.INGEST_SOCIOS_URL }}
+          INGEST_SOCIOS_TOKEN: ${{ secrets.INGEST_SOCIOS_TOKEN }}
+        run: node src/socios/main.js
