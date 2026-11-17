@@ -21,8 +21,17 @@ try {
   const nav = await criarNavegador(context);
   await nav.entrar({ usuario: env.NOVAVIDA_USUARIO, senha: env.NOVAVIDA_SENHA, cliente: env.NOVAVIDA_EMPRESA });
   console.log('login: ok');
-  console.log('busca:', await nav.buscarCnpj(env.MAPEAR_CNPJ) ? 'ok' : 'NÃO ACHOU');
-  console.log('sócios:', await nav.abrirSocios() ? 'ok' : 'NÃO ABRIU');
+  // cada passo: "ok" ou "NÃO (tipo do erro)"; a navegação lança quando falha
+  const passo = async (nome, fn) => { try { await fn(); console.log(`${nome}: ok`); return true; } catch (e) { console.log(`${nome}: NÃO (${e.name})`); return false; } };
+  const caminho = () => new URL(nav.urlAtual()).pathname; // só o caminho (/Pj/Cadastro), nunca a query
+  if (!(await passo('busca', () => nav.buscarCnpj(env.MAPEAR_CNPJ)))) { console.log('página:', caminho()); process.exitCode = 1; }
+  else if (!(await passo('sócios', () => nav.abrirSocios()))) {
+    // Diagnóstico ESTRUTURAL (tags e classes da interface, sem texto de pessoa): onde aparece o texto "Sócios"
+    console.log('página:', caminho());
+    for (const d of await nav.diagnosticoSocios()) console.log('  "Sócios" em:', d);
+    process.exitCode = 1;
+  }
+  if (process.exitCode) throw new Error('parou no passo acima');
   const cartoes = await nav.lerCartoes();
   console.log('cartões de sócio:', cartoes.length);
   const saida = ['=== CARTÕES ===', ...cartoes.map((c, i) => `--- cartão ${i} ---\n${mascarar(c)}`)];
@@ -30,6 +39,7 @@ try {
     const p = await nav.lerPessoa(0);
     console.log('pessoa 0: fixos', p.fixos ? 'achou' : 'NÃO ACHOU', '· celulares', p.celulares ? 'achou' : 'NÃO ACHOU');
     saida.push('=== FIXOS (sócio 0) ===', mascarar(p.fixos), '=== CELULARES (sócio 0) ===', mascarar(p.celulares));
+    if (!p.fixos || !p.celulares) for (const d of await nav.diagnosticoTelefones(0)) console.log('  telefones:', d);
     console.log('voltou para Sócios:', (await nav.lerCartoes()).length === cartoes.length ? 'ok' : 'NÃO');
   }
   fs.mkdirSync('recon', { recursive: true });

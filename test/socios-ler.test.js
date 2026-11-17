@@ -53,3 +53,18 @@ test('cartaoTemCpf (usado na página): aceita CPF só dígitos e formatado, como
   assert.equal(cartaoTemCpf('ZZ\n50.00%\nParticipação'), false);
   assert.equal(cartaoTemCpf('ZZ\n(11) 90000-0001'), false);
 });
+test('lerCartaoSocio: formato real do Congonhas (mapeado 17/11): ícones antes e depois do CPF, linhas vazias, vírgula', () => {
+  const t = 'account_circle\nZZ SOCIA DO TESTE\n12345678909\nmanage_search\n\nParticipação\n\n50,00%\n\nParticipação em empresas';
+  assert.deepEqual(lerCartaoSocio(t, 0), { indice: 0, nome: 'ZZ SOCIA DO TESTE', cpf: '12345678909', participacao: 50 });
+});
+test('lerTelefones: formato real do Congonhas (mapeado 17/11): ícones de avaliação e rodapé não atrapalham', () => {
+  const ic = '\tthumb_up thumb_down person_search';
+  const fixos = `call\nTelefones fixos\nMobilidade cadastral: MEDIA\n\n(11) 3000-0001\n\nVIVO\n${ic}`;
+  const cel = `ad_units\nCelulares\nMobilidade cadastral: MEDIA\n\n(11) 90000-0001\nWHATSAPP\n\nCLARO\n${ic}\n\n\n(11) 90000-0002\nWHATSAPP\nPROCON\n\nCLARO\n${ic}\n\n\n(11) 90000-0003\n\nTIM\n${ic}\nver todos\n3`;
+  assert.deepEqual(lerTelefones(fixos, 'fixo'), [{ tipo: 'fixo', numero: '1130000001', operadora: 'VIVO', whatsapp: false }]);
+  assert.deepEqual(lerTelefones(cel, 'celular'), [
+    { tipo: 'celular', numero: '11900000001', operadora: 'CLARO', whatsapp: true },
+    { tipo: 'celular', numero: '11900000002', operadora: 'CLARO', whatsapp: true },
+    { tipo: 'celular', numero: '11900000003', operadora: 'TIM', whatsapp: false },
+  ]);
+});
